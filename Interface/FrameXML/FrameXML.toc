@@ -37,6 +37,7 @@
 ..\SharedXML\EasingUtil.lua
 ..\SharedXML\BindingUtil.lua
 ..\SharedXML\FrameUtil.lua
+..\SharedXML\InputUtil.lua
 ..\SharedXML\EventUtil.lua
 ..\SharedXML\RegionUtil.lua
 ..\SharedXML\AnchorUtil.lua
@@ -168,6 +169,7 @@ MapUtil.lua
 AzeriteUtil.lua
 AzeriteEssenceUtil.lua
 AuraUtil.lua
+ArenaUtil.lua
 CalendarUtil.lua
 CommunitiesUtil.lua
 RuneforgeUtil.xml
@@ -409,6 +411,7 @@ CompactUnitFrame.xml
 CompactRaidGroup.xml
 CompactPartyFrame.xml
 CompactArenaFrame.xml
+Deprecated_ArenaUI.xml
 RolePoll.xml
 SpellFlyout.xml
 PaladinPowerBar.xml
