@@ -354,7 +354,7 @@ function ProfessionsCraftingPageMixin:Reset()
 end
 
 function ProfessionsCraftingPageMixin:GetDesiredPageWidth()
-	if Professions.IsCraftingMinimized() then
+	if ProfessionsUtil.IsCraftingMinimized() then
 		return 404;
 	end
 
@@ -473,7 +473,7 @@ function ProfessionsCraftingPageMixin:GetCraftableCount()
 		for slotIndex, reagents in transaction:EnumerateAllSlotReagents() do
 			if transaction:IsSlotBasicReagentType(slotIndex) then
 				local quantity = AccumulateOp(reagents, function(reagent)
-					return Professions.GetReagentQuantityInPossession(reagent);
+					return ProfessionsUtil.GetReagentQuantityInPossession(reagent);
 				end);
 
 				local quantityMax = transaction:GetQuantityRequiredInSlot(slotIndex);
@@ -486,7 +486,7 @@ function ProfessionsCraftingPageMixin:GetCraftableCount()
 					local quantity = AccumulateOp(reagents, function(reagent)
 						-- Only include the allocated reagents for modifying-required slots.
 						if transaction:IsReagentAllocated(slotIndex, reagent) then
-							return Professions.GetReagentQuantityInPossession(reagent);
+							return ProfessionsUtil.GetReagentQuantityInPossession(reagent);
 						end
 						return 0;
 					end);
@@ -754,7 +754,7 @@ end
 local function FindFirstRecipe(dataProvider)
 	-- Select an initial recipe. As mentioned above, every recipe in the data provider is the
 	-- first recipe in the instance it has levels.
-	for index, node in dataProvider:Enumerate() do
+	for index, node in dataProvider:EnumerateEntireRange() do
 		local data = node:GetData();
 		local recipeInfo = data.recipeInfo;
 		-- Don't select recrafting as the initial recipe, since its filtering can cause confusion
@@ -769,11 +769,13 @@ local function FindRecipeInfo(dataProvider, recipeID)
 		return nil;
 	end
 
-	local node = dataProvider:FindElementDataByPredicate(function(node)
+	local function IsRecipeMatch(node)
 		local data = node:GetData();
 		local recipeInfo = data.recipeInfo;
 		return recipeInfo and recipeInfo.recipeID == recipeID;
-	end);
+	end
+
+	local node = dataProvider:FindElementDataByPredicate(IsRecipeMatch, TreeDataProviderConstants.IncludeCollapsed);
 
 	if node then
 		local data = node:GetData();
@@ -857,7 +859,7 @@ function ProfessionsCraftingPageMixin:Init(professionInfo)
 	end
 	self.RecipeList.NoResultsText:SetShown(dataProvider:IsEmpty());
 	
-	local minimized = Professions.IsCraftingMinimized();
+	local minimized = ProfessionsUtil.IsCraftingMinimized();
 	if minimized and self.MinimizedSearchBox:IsCurrentTextValidForSearch() then
 		self.searchDataProvider = CreateDataProvider();
 		for index, node in dataProvider:Enumerate() do
@@ -928,7 +930,7 @@ function ProfessionsCraftingPageMixin:Refresh(professionInfo)
 	local isRuneforging = C_TradeSkillUI.IsRuneforging();
 
 	local schematicWidth;
-	local minimized = Professions.IsCraftingMinimized();
+	local minimized = ProfessionsUtil.IsCraftingMinimized();
 	if minimized then
 		self.RecipeList:Hide();
 		self.MinimizedSearchBox:Show();
@@ -1212,7 +1214,7 @@ function ProfessionsCraftingPageMixin:UpdateTutorial()
 		};
 		table.insert(ProfessionsCraftingPage_HelpPlate, qualityMeterSection);
 	end
-	if detailsShown and not Professions.IsCraftingMinimized() then
+	if detailsShown and not ProfessionsUtil.IsCraftingMinimized() then
 		local statsTopPoint = details:GetTop() - self:GetTop() + 6;
 		local statsLeftPoint = details:GetLeft() - self:GetLeft();
 		local statsBoxWidth = 251;
@@ -1248,7 +1250,7 @@ function ProfessionsCraftingPageMixin:UpdateTutorial()
 		table.insert(ProfessionsCraftingPage_HelpPlate, finishingReagentsSection);
 	end
 
-	if Professions.IsCraftingMinimized() and self.SchematicForm.FinishingReagents:IsShown() then
+	if ProfessionsUtil.IsCraftingMinimized() and self.SchematicForm.FinishingReagents:IsShown() then
 		local finishingReagentsTopPoint = self.SchematicForm.FinishingReagents:GetTop() - self:GetTop();
 		local finishingReagentsLeftPoint = self.SchematicForm.FinishingReagents:GetLeft() - self:GetLeft();
 		local slots = self.SchematicForm:GetSlotsByReagentType(Enum.CraftingReagentType.Finishing);

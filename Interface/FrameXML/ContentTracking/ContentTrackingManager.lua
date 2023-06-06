@@ -53,20 +53,13 @@ function ContentTrackingManagerMixin:OnTrackingTargetInfoUpdate(targetType, targ
 	ObjectiveTracker_Update(OBJECTIVE_TRACKER_UPDATE_TARGET_INFO, targetID, moduleWhoseCollapseChanged, targetType);
 end
 
-function ContentTrackingManagerMixin:OnTransmogSourceCollected(trackableID)
-	-- If the source is currently showing in the objective tracker, the objective tracker will handle un-tracking the item after animations
-	if not ADVENTURE_TRACKER_MODULE:IsShowingBlock(trackableID) then
-		C_ContentTracking.StopTracking(Enum.ContentTrackingType.Appearance, trackableID);
-	end
-end
-
 local ContentTrackingManager = CreateAndInitFromMixin(ContentTrackingManagerMixin);
 EventRegistry:RegisterFrameEventAndCallback("CONTENT_TRACKING_UPDATE", ContentTrackingManager.OnContentTrackingUpdate, ContentTrackingManager);
 EventRegistry:RegisterFrameEventAndCallback("TRACKING_TARGET_INFO_UPDATE", ContentTrackingManager.OnTrackingTargetInfoUpdate, ContentTrackingManager);
-EventRegistry:RegisterFrameEventAndCallback("TRANSMOG_COLLECTION_SOURCE_ADDED", ContentTrackingManager.OnTransmogSourceCollected, ContentTrackingManager);
-
 
 ContentTrackingUtil = {};
+
+local CombinedIDOffset = 1000;
 
 ContentTrackingUtil.IsTrackingModifierDown = IsShiftKeyDown;
 
@@ -105,9 +98,7 @@ function ContentTrackingUtil.OpenMapToTrackable(trackableType, trackableID)
 	end
 
 	local unused_trackingResult, uiMapID = C_ContentTracking.GetBestMapForTrackable(trackableType, trackableID);
-	-- TODO:: If unused_trackingResult is DataPending, should we give an error?
 	if uiMapID then
-		-- TODO:: ping?
 		OpenWorldMap(uiMapID);
 	end
 end
@@ -120,4 +111,14 @@ function ContentTrackingUtil.DisplayTrackingError(trackingError)
 	elseif trackingError == Enum.ContentTrackingError.AlreadyTracked then
 		UIErrorsFrame:AddExternalErrorMessage(CONTENT_TRACKING_ALREADYTRACKED_ERROR_TEXT);
 	end
+end
+
+function ContentTrackingUtil.MakeCombinedID(trackableType, trackableID)
+	return (trackableID * CombinedIDOffset) + trackableType;
+end
+
+function ContentTrackingUtil.SplitCombinedID(combinedTrackableID)
+	local trackableType = (combinedTrackableID % CombinedIDOffset);
+	local trackableID = math.floor(combinedTrackableID / CombinedIDOffset);
+	return trackableType, trackableID;
 end

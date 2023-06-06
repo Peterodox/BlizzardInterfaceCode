@@ -534,7 +534,7 @@ EDIT_MODE_MODERN_SYSTEM_MAP =
 			relativeTo = "MicroButtonAndBagsBar",
 			relativePoint = "TOPRIGHT",
 			offsetX = 0,
-			offsetY = 0,
+			offsetY = 10,
 		},
 	},
 
@@ -571,6 +571,45 @@ EDIT_MODE_MODERN_SYSTEM_MAP =
 			point = "RIGHT",
 			relativeTo = "UIParent",
 			relativePoint = "RIGHT",
+			offsetX = 0,
+			offsetY = 0,
+		},
+	},
+
+	[Enum.EditModeSystem.TimerBars] = {
+		settings = {
+			[Enum.EditModeTimerBarsSetting.Size] = 0,
+		},
+		anchorInfo = {
+			point = "TOP",
+			relativeTo = "UIParent",
+			relativePoint = "TOP",
+			offsetX = 0,
+			offsetY = -100,
+		},
+	},
+
+	[Enum.EditModeSystem.VehicleSeatIndicator] = {
+		settings = {
+			[Enum.EditModeVehicleSeatIndicatorSetting.Size] = 10,
+		},
+		anchorInfo = {
+			point = "RIGHT",
+			relativeTo = "UIParent",
+			relativePoint = "RIGHT",
+			offsetX = 0,
+			offsetY = 0,
+		},
+	},
+
+	[Enum.EditModeSystem.ArchaeologyBar] = {
+		settings = {
+			[Enum.EditModeArchaeologyBarSetting.Size] = 0,
+		},
+		anchorInfo = {
+			point = "BOTTOM",
+			relativeTo = "UIParent",
+			relativePoint = "BOTTOM",
 			offsetX = 0,
 			offsetY = 0,
 		},
@@ -1109,7 +1148,7 @@ EDIT_MODE_CLASSIC_SYSTEM_MAP =
 			relativeTo = "MicroButtonAndBagsBar",
 			relativePoint = "TOPRIGHT",
 			offsetX = 0,
-			offsetY = 0,
+			offsetY = 10,
 		},
 	},
 
@@ -1146,6 +1185,45 @@ EDIT_MODE_CLASSIC_SYSTEM_MAP =
 			point = "RIGHT",
 			relativeTo = "UIParent",
 			relativePoint = "RIGHT",
+			offsetX = 0,
+			offsetY = 0,
+		},
+	},
+
+	[Enum.EditModeSystem.TimerBars] = {
+		settings = {
+			[Enum.EditModeTimerBarsSetting.Size] = 0,
+		},
+		anchorInfo = {
+			point = "TOP",
+			relativeTo = "UIParent",
+			relativePoint = "TOP",
+			offsetX = 0,
+			offsetY = -100,
+		},
+	},
+
+	[Enum.EditModeSystem.VehicleSeatIndicator] = {
+		settings = {
+			[Enum.EditModeVehicleSeatIndicatorSetting.Size] = 10,
+		},
+		anchorInfo = {
+			point = "RIGHT",
+			relativeTo = "UIParent",
+			relativePoint = "RIGHT",
+			offsetX = 0,
+			offsetY = 0,
+		},
+	},
+
+	[Enum.EditModeSystem.ArchaeologyBar] = {
+		settings = {
+			[Enum.EditModeArchaeologyBarSetting.Size] = 0,
+		},
+		anchorInfo = {
+			point = "BOTTOM",
+			relativeTo = "UIParent",
+			relativePoint = "BOTTOM",
 			offsetX = 0,
 			offsetY = 0,
 		},
