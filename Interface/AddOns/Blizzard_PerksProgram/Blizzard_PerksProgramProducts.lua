@@ -170,8 +170,6 @@ function PerksProgramProductsFrameMixin:OnUpdate(deltaTime)
 end
 
 function PerksProgramProductsFrameMixin:OnProductSelectedAfterModel(data)
-	local showDetailsFrame = not (data.perksVendorCategoryID == Enum.PerksVendorCategoryType.Toy);
-	self.PerksProgramProductDetailsContainerFrame:SetShown(showDetailsFrame);
 	C_PerksProgram.ItemSelectedTelemetry(data.perksVendorItemID);
 end
 
@@ -232,6 +230,7 @@ end
 function PerksProgram_TranslateDisplayInfo(perksVendorCategoryID, displayInfo)
 	local newData = {};
 	local modelSceneID = displayInfo.overrideModelSceneID or displayInfo.defaultModelSceneID;
+	local creatureDisplayInfoID = displayInfo.creatureDisplayInfoID;
 	if modelSceneID then
 		local _, cameraIDs, actorIDs, flags = C_ModelInfo.GetModelSceneInfoByID(modelSceneID);
 		
@@ -308,7 +307,8 @@ function PerksProgram_TranslateDisplayInfo(perksVendorCategoryID, displayInfo)
 	end
 	newData.defaultModelSceneID = displayInfo.defaultModelSceneID;
 	newData.overrideModelSceneID = displayInfo.overrideModelSceneID;
-	newData.selectedModelScene = modelSceneID;	
+	newData.selectedModelSceneID = modelSceneID;
+	newData.creatureDisplayInfoID = creatureDisplayInfoID;
 	return newData;
 end
 

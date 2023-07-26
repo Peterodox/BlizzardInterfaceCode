@@ -174,6 +174,7 @@ function CharacterSelect_OnLoad(self)
 	self:RegisterEvent("SOCIAL_CONTRACT_STATUS_UPDATE");
 	self:RegisterEvent("ACCOUNT_SAVE_ENABLED_UPDATE");
 	self:RegisterEvent("ACCOUNT_LOCKED_POST_SAVE_UPDATE");
+	self:RegisterEvent("REALM_HIDDEN_INFO_UPDATE");
 
     SetCharSelectModelFrame("CharacterSelectModel");
 
@@ -380,8 +381,6 @@ function CharacterSelect_OnShow(self)
 end
 
 function CharacterSelect_OnHide(self)
-	CharacterSelectCharacterFrame.ScrollBox.dragBehavior:AbortDrag();
-
     CharacterSelect_SaveCharacterOrder();
     CharacterDeleteDialog:Hide();
     CharacterRenameDialog:Hide();
@@ -556,12 +555,12 @@ function CharacterSelect_OnKeyDown(self,key)
     elseif key == "PRINTSCREEN" then
         Screenshot();
     elseif key == "UP" or key == "LEFT" then
-        if CharSelectServicesFlowFrame:IsShown() then
+        if CharSelectServicesFlowFrame:IsShown() and CharSelectServicesFlowFrame.DisableButtons then
             return;
         end
         CharacterSelectScrollUp_OnClick();
     elseif ( key == "DOWN" or key == "RIGHT" ) then
-        if (CharSelectServicesFlowFrame:IsShown()) then
+        if CharSelectServicesFlowFrame:IsShown() and CharSelectServicesFlowFrame.DisableButtons then
             return;
         end
         CharacterSelectScrollDown_OnClick();
@@ -745,6 +744,14 @@ function CharacterSelect_OnEvent(self, event, ...)
         CharacterSelect_ConditionallyLoadAccountSaveUI();
     elseif (event == "ACCOUNT_LOCKED_POST_SAVE_UPDATE" ) then
         CharacterSelect_UpdateIfUpdateIsNotPending();
+	elseif (event == "REALM_HIDDEN_INFO_UPDATE") then
+		local text = ...;
+		if(text) then
+			REALM_HIDDEN_ALERT:SetText(text);
+			REALM_HIDDEN_ALERT:Show();
+		else
+			REALM_HIDDEN_ALERT:Hide();
+		end
 	end
 end
 
@@ -1398,7 +1405,7 @@ function CharacterSelect_SelectCharacter(index, noCreate)
         -- Update the text of the EnterWorld button based on the type of character that's selected, default to "enter world"
         local text = ENTER_WORLD;
 
-        local isTrialBoostLocked, revokedCharacterUpgrade = select(23,GetCharacterInfo(GetCharacterSelection()));
+        local boostInProgress, _, _, _, isTrialBoostLocked, revokedCharacterUpgrade = select(19,GetCharacterInfo(GetCharacterSelection()));
         if ( isTrialBoostLocked ) then
             text = ENTER_WORLD_UNLOCK_TRIAL_CHARACTER;
 		elseif ( revokedCharacterUpgrade ) then
@@ -1407,9 +1414,12 @@ function CharacterSelect_SelectCharacter(index, noCreate)
 
         CharSelectEnterWorldButton:SetText(text);
 
-		if not CharacterServicesFlow_IsShowing() or not CharacterServicesMaster.flow:UsesSelector() then
+		if not boostInProgress and not CharacterServicesFlow_IsShowing() or not CharacterServicesMaster.flow:UsesSelector() then
 			if IsRPEBoostEligible(charID) then
 				BeginCharacterServicesFlow(RPEUpgradeFlow, {});
+				if IsVeteranTrialAccount() then
+					CharSelectServicesFlow_Minimize() --if they need to resubscribe, get the RPE flow out of the way.
+				end
 			else
 				EndCharacterServicesFlow(false);
 			end
@@ -2234,6 +2244,11 @@ local function GetCharacterServiceDisplayOrder()
 end
 
 function IsRPEBoostEligible(charID)
+	if CharacterSelect.undeleting then
+		-- Deleted characters are not eligible for RPE Boost (until they are restored)
+		return false;
+	end
+
 	return select(36, GetCharacterInfo(charID));
 end
 
@@ -2346,6 +2361,8 @@ local function GetVASDistributions()
 					usable = DoesClientThinkTheCharacterIsEligibleForPFC(charID);
 				elseif vasType == Enum.ValueAddedServiceType.PaidRaceChange then
 					usable = DoesClientThinkTheCharacterIsEligibleForPRC(charID);
+				elseif vasType == Enum.ValueAddedServiceType.PaidNameChange then
+					usable = DoesClientThinkTheCharacterIsEligibleForPNC(charID);
 				end
 				if usable then
 					break;
@@ -2560,10 +2577,10 @@ function CharacterUpgradePopup_OnCharacterBoostDelivered(boostType, guid, reason
 end
 
 function BeginCharacterServicesFlow(flow, data)
+	CharSelectServicesFlowFrame:Initialize(flow);
     CharSelectServicesFlowFrame:Show();
 	flow:SetTarget(data); -- NOTE: It seems like data can be changed in the middle of a flow, so keeping this here until that is determined.
 	CharacterServicesMaster_SetFlow(CharacterServicesMaster, flow);
-	CharSelectServicesFlowFrame:Initialize(flow);
 end
 
 function EndCharacterServicesFlow(shouldMaximize)
@@ -2600,6 +2617,8 @@ function CharacterUpgradePopup_BeginVASFlow(data, guid)
 		BeginCharacterServicesFlow(PaidFactionChangeFlow, data);
 	elseif data.vasType == Enum.ValueAddedServiceType.PaidRaceChange then
 		BeginCharacterServicesFlow(PaidRaceChangeFlow, data);
+	elseif data.vasType == Enum.ValueAddedServiceType.PaidNameChange then
+		BeginCharacterServicesFlow(PaidNameChangeFlow, data);
 	else
 		error("Unsupported VAS Type Flow");
 	end
@@ -2771,8 +2790,12 @@ function CharacterServicesMaster_SetFlow(self, flow)
 	CharacterServicesMaster_HideFlows(self);
 
     flow:Initialize(self);
-    SetPortraitToTexture(self:GetParent().Icon, flow.data.icon);
-    self:GetParent().TitleText:SetText(flow.data.flowTitle);
+	if flow.data.icon then
+		SetPortraitToTexture(self:GetParent().Icon, flow.data.icon);
+	end
+	if flow.data.flowTitle then
+		self:GetParent().TitleText:SetText(flow.data.flowTitle);
+	end
 
     CharacterServicesMaster_UpdateFinishLabel(self);
 
@@ -3479,10 +3502,17 @@ function CharSelectServicesFlowFrameMixin:ClearErrorMessage()
 end
 
 function CharSelectServicesFlowFrameMixin:Initialize(flow)
-	self.MinimizedFrame = _G[flow.MinimizedFrame];
-	self.DisableButtons = flow.DisableButtons;
+	if not flow.MinimizedFrame then
+		self.IsMinimized = false; --flows that cant minimize should no longer be tracking that they are minimized.
+		if self.MinimizedFrame then 
+			self.MinimizedFrame:Hide(); --any previously minimized frames should be hidden (will be cleared in CharSelectServicesFlowFrame:Initialize)
+		end
+	end
 
-	local theme = flow.theme;
+	self.MinimizedFrame = flow.MinimizedFrame and _G[flow.MinimizedFrame];
+	self.DisableButtons = flow:ShouldDisableButtons();
+
+	local theme = flow:GetTheme();
 	if theme == "default" then
 		self.BackgroundDefault:Show();
 		self.Icon:Show();

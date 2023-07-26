@@ -219,6 +219,11 @@ function CompactUnitFrame_SetUnit(frame, unit)
 		frame.hideCastbar = frame.optionTable.hideCastbar;
 		frame.healthBar.healthBackground = nil;
 
+		frame.aurasDirty = nil;
+		frame.healthDirty = nil;
+		frame.healPredictionDirty = nil;
+		frame.needsUpdate = nil;
+
 		frame:SetAttribute("unit", unit);
 		if ( unit ) then
 			CompactUnitFrame_RegisterEvents(frame);
@@ -1163,8 +1168,7 @@ function CompactUnitFrame_UpdateRoleIcon(frame)
 	else
 		local role = UnitGroupRolesAssigned(frame.unit);
 		if ( frame.optionTable.displayRoleIcon and (role == "TANK" or role == "HEALER" or role == "DAMAGER") ) then
-			frame.roleIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES");
-			frame.roleIcon:SetTexCoord(GetTexCoordsForRoleSmallCircle(role));
+			frame.roleIcon:SetAtlas(GetMicroIconForRole(role), TextureKitConstants.IgnoreAtlasSize);
 			frame.roleIcon:Show();
 			frame.roleIcon:SetSize(size, size);
 		else
@@ -1182,13 +1186,13 @@ function CompactUnitFrame_UpdateReadyCheck(frame)
 	local readyCheckStatus = GetReadyCheckStatus(frame.unit);
 	frame.readyCheckStatus = readyCheckStatus;
 	if ( readyCheckStatus == "ready" ) then
-		frame.readyCheckIcon:SetTexture(READY_CHECK_READY_TEXTURE);
+		frame.readyCheckIcon:SetAtlas(READY_CHECK_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
 		frame.readyCheckIcon:Show();
 	elseif ( readyCheckStatus == "notready" ) then
-		frame.readyCheckIcon:SetTexture(READY_CHECK_NOT_READY_TEXTURE);
+		frame.readyCheckIcon:SetAtlas(READY_CHECK_NOT_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
 		frame.readyCheckIcon:Show();
 	elseif ( readyCheckStatus == "waiting" ) then
-		frame.readyCheckIcon:SetTexture(READY_CHECK_WAITING_TEXTURE);
+		frame.readyCheckIcon:SetAtlas(READY_CHECK_WAITING_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
 		frame.readyCheckIcon:Show();
 	else
 		frame.readyCheckIcon:Hide();
@@ -1204,7 +1208,7 @@ function CompactUnitFrame_FinishReadyCheck(frame)
 		CompactUnitFrame_CheckNeedsUpdate(frame);
 
 		if ( frame.readyCheckStatus == "waiting" ) then	--If you haven't responded, you are not ready.
-			frame.readyCheckIcon:SetTexture(READY_CHECK_NOT_READY_TEXTURE);
+			frame.readyCheckIcon:SetAtlas(READY_CHECK_NOT_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
 			frame.readyCheckIcon:Show();
 		end
 	else
@@ -1917,7 +1921,7 @@ function DefaultCompactUnitFrameSetup(frame)
 	frame.statusText:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -3, frameHeight / 3 - 2);
 	frame.statusText:SetHeight(12 * componentScale);
 
-	local readyCheckSize = 15 * componentScale;
+	local readyCheckSize = 20 * componentScale;
 	frame.readyCheckIcon:ClearAllPoints();
 	frame.readyCheckIcon:SetPoint("BOTTOM", frame, "BOTTOM", 0, frameHeight / 3 - 4);
 	frame.readyCheckIcon:SetSize(readyCheckSize, readyCheckSize);

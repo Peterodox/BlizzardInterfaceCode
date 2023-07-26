@@ -3,6 +3,7 @@ local ContentTrackingManagerMixin = {};
 
 function ContentTrackingManagerMixin:Init()
 	self.typeToTrackableElementMap = {};
+	self.isEnabled = C_ContentTracking.GetCollectableSourceTrackingEnabled();
 end
 
 function ContentTrackingManagerMixin:GetTrackableElementsList(trackableType, trackableID)
@@ -26,7 +27,9 @@ end
 
 function ContentTrackingManagerMixin:OnContentTrackingUpdate(trackableType, id, isTracked)
 	if trackableType == Enum.ContentTrackingType.Achievement then
-		AchievementFrameAchievements_UpdateTrackedAchievements();
+		if AchievementFrameAchievements_UpdateTrackedAchievements then
+			AchievementFrameAchievements_UpdateTrackedAchievements();
+		end
 
 		if isTracked then
 			ObjectiveTracker_Update(OBJECTIVE_TRACKER_UPDATE_ACHIEVEMENT_ADDED, id);
@@ -53,15 +56,25 @@ function ContentTrackingManagerMixin:OnTrackingTargetInfoUpdate(targetType, targ
 	ObjectiveTracker_Update(OBJECTIVE_TRACKER_UPDATE_TARGET_INFO, targetID, moduleWhoseCollapseChanged, targetType);
 end
 
+function ContentTrackingManagerMixin:OnContentTrackingToggled(isEnabled)
+	self.isEnabled = isEnabled;
+	ObjectiveTracker_Update(OBJECTIVE_TRACKER_UPDATE_MODULE_ADVENTURE);
+end
+
 local ContentTrackingManager = CreateAndInitFromMixin(ContentTrackingManagerMixin);
 EventRegistry:RegisterFrameEventAndCallback("CONTENT_TRACKING_UPDATE", ContentTrackingManager.OnContentTrackingUpdate, ContentTrackingManager);
 EventRegistry:RegisterFrameEventAndCallback("TRACKING_TARGET_INFO_UPDATE", ContentTrackingManager.OnTrackingTargetInfoUpdate, ContentTrackingManager);
+EventRegistry:RegisterFrameEventAndCallback("CONTENT_TRACKING_IS_ENABLED_UPDATE", ContentTrackingManager.OnContentTrackingToggled, ContentTrackingManager);
 
 ContentTrackingUtil = {};
 
 local CombinedIDOffset = 1000;
 
 ContentTrackingUtil.IsTrackingModifierDown = IsShiftKeyDown;
+
+function ContentTrackingUtil.IsContentTrackingEnabled()
+	return ContentTrackingManager.isEnabled;
+end
 
 function ContentTrackingUtil.RegisterTrackableElement(element, trackableType, trackableID)
 	ContentTrackingManager:RegisterTrackableElement(element, trackableType, trackableID);
@@ -81,20 +94,63 @@ function ContentTrackingUtil.ProcessChatLink(unused_trackableType, unused_tracka
 	return false;
 end
 
+function ContentTrackingUtil.GetTrackingMapInfoByEncounterID(encounterID)
+	local trackedEncounterMapInfos = {};
+	for i, trackableType in ipairs(C_ContentTracking.GetCollectableSourceTypes()) do
+		local trackedIDs = C_ContentTracking.GetTrackedIDs(trackableType);
+		for j, trackableID in ipairs(trackedIDs) do
+			local targetType, targetID = C_ContentTracking.GetCurrentTrackingTarget(trackableType, trackableID);
+			if targetType == Enum.ContentTrackingTargetType.JournalEncounter then
+				local encounterTrackingInfo = targetID and C_ContentTracking.GetEncounterTrackingInfo(targetID) or nil;
+				if encounterTrackingInfo and encounterTrackingInfo.journalEncounterID == encounterID then
+					local mapInfo = {};
+					mapInfo.trackableID = trackableID;
+					mapInfo.trackableType = trackableType;
+					mapInfo.targetType = targetType;
+					mapInfo.targetID = targetID;
+					mapInfo.difficultyID = encounterTrackingInfo.difficultyID;
+					table.insert(trackedEncounterMapInfos, mapInfo);
+				end
+			end
+		end
+	end
+	
+	return trackedEncounterMapInfos;
+end
+
+function ContentTrackingUtil.IsContentTrackedInEncounter(encounterID)
+	for i, trackableType in ipairs(C_ContentTracking.GetCollectableSourceTypes()) do
+		local trackedIDs = C_ContentTracking.GetTrackedIDs(trackableType);
+		for j, trackableID in ipairs(trackedIDs) do
+			local targetType, targetID = C_ContentTracking.GetCurrentTrackingTarget(trackableType, trackableID);
+			if targetType == Enum.ContentTrackingTargetType.JournalEncounter then
+				local encounterTrackingInfo = targetID and C_ContentTracking.GetEncounterTrackingInfo(targetID) or nil;
+				if encounterTrackingInfo then
+					if encounterID == encounterTrackingInfo.journalEncounterID then
+						return true;
+					end
+				end
+			end
+		end
+	end
+	
+	return false;
+end
+
 function ContentTrackingUtil.OpenMapToTrackable(trackableType, trackableID)
 	--First check if we are in the target encounter instance. If so, open the encounter map rather than world map
 	local unused_targetType, targetID = C_ContentTracking.GetCurrentTrackingTarget(trackableType, trackableID);
 	local encounterTrackingInfo = targetID and C_ContentTracking.GetEncounterTrackingInfo(targetID) or nil;
-	if encounterTrackingInfo then
-		local currentMapID = MapUtil.GetDisplayableMapForPlayer();
-		local currentInstanceID = EJ_GetInstanceForMap(currentMapID);
-		if currentInstanceID and encounterTrackingInfo.journalInstanceID == currentInstanceID then
-			--This already opens to the map the player is on, if in the future we want to open to the floor the target is on, we can feed this function a mapID
-			--EJ_SelectInstance(encounterTrackingInfo.journalInstanceID);
-			--local _, _, _, _, _, _, targetMapID = EJ_GetInstanceInfo();
+	if encounterTrackingInfo and AdventureGuideUtil.IsInInstance(encounterTrackingInfo.journalInstanceID) then
+		--This already opens to the map the player is on, if in the future we want to open to the floor the target is on, we can feed this function a mapID
+		--EJ_SelectInstance(encounterTrackingInfo.journalInstanceID);
+		--local _, _, _, _, _, _, targetMapID = EJ_GetInstanceInfo();
+		if not WorldMapFrame:IsShown() then
 			OpenWorldMap();
-			return;
+		else
+			WorldMapFrame:SetMapID(MapUtil.GetDisplayableMapForPlayer());
 		end
+		return;
 	end
 
 	local unused_trackingResult, uiMapID = C_ContentTracking.GetBestMapForTrackable(trackableType, trackableID);

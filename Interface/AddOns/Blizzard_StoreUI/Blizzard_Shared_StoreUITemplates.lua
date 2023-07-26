@@ -250,7 +250,7 @@ end
 
 function CategoryTreeScrollContainerMixin:OnHide()
 	self.selectionBehavior:ClearSelections();
-	self.ScrollBox:ClearDataProvider();
+	self.ScrollBox:RemoveDataProvider();
 end
 
 function CategoryTreeScrollContainerMixin:OnEvent(event, ...)
@@ -304,14 +304,16 @@ function CategoryTreeScrollContainerMixin:UpdateCategories()
 				parentGroupEntry = productGroupMap[parentGroupID];
 				if not parentGroupEntry and parentProductGroup then
 					productGroupMap[parentGroupID] = parentProductGroup;
-					productGroupMap[parentGroupID].children = {};
 					dataProvider:Insert(parentProductGroup);
-
 					parentGroupEntry = productGroupMap[parentGroupID];
 				end
 
 				if parentGroupEntry then
-					productGroupMap[parentGroupID].children[groupID] = productGroup;
+					local parentGroup = productGroupMap[parentGroupID];
+					if not parentGroup.children then
+						parentGroup.children = {};
+					end
+					parentGroup.children[groupID] = productGroup;
 
 					dataProvider:InsertInParentByPredicate(productGroup, function(node)
 						local data = node:GetData();

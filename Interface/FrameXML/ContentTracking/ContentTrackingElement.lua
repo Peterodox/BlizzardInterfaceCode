@@ -24,6 +24,10 @@ function ContentTrackingElementMixin:SetTrackable(trackableType, trackableID)
 end
 
 function ContentTrackingElementMixin:AddTrackable(trackableType, trackableID)
+	if not ContentTrackingUtil.IsContentTrackingEnabled() then
+		return;
+	end
+
 	self.trackables = self.trackables or {};
 	table.insert(self.trackables, { trackableType = trackableType, id = trackableID });
 	ContentTrackingUtil.RegisterTrackableElement(self, trackableType, trackableID);
@@ -42,15 +46,27 @@ end
 function ContentTrackingElementMixin:CheckTrackableClick(buttonName, trackableType, trackableID)
 	if (buttonName == "LeftButton") and ContentTrackingUtil.IsTrackingModifierDown() then
 		local trackingError = C_ContentTracking.ToggleTracking(trackableType, trackableID);
-		if trackingError then 
-			ContentTrackingUtil.DisplayTrackingError(trackingError)
+		if trackingError then
+			ContentTrackingUtil.DisplayTrackingError(trackingError);
 		end
+		local isTracking = C_ContentTracking.IsTracking(trackableType, trackableID);
+		if isTracking then
+			PlaySound(SOUNDKIT.CONTENT_TRACKING_START_TRACKING);
+			PlaySound(SOUNDKIT.CONTENT_TRACKING_OBJECTIVE_TRACKING_START);
+		else
+			PlaySound(SOUNDKIT.CONTENT_TRACKING_STOP_TRACKING);
+		end
+
 		if #self.trackables == 1 then
-			self:SetTrackingCheckmarkShown(C_ContentTracking.IsTracking(trackableType, trackableID));
+			self:SetTrackingCheckmarkShown(isTracking);
 		else
 			self:UpdateTrackingCheckmark();
 		end
+
+		return not trackingError;
 	end
+
+	return false;
 end
 
 function ContentTrackingElementMixin:UpdateTrackingCheckmark()

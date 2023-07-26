@@ -513,7 +513,7 @@ function CharacterServices_UpdateSpecializationButtons(classID, gender, parentFr
 			button.SpecIcon:SetDesaturated(not allowed);
 			button.Frame:SetDesaturated(not allowed);
 			button.SpecName:SetText(name);
-			button.RoleIcon:SetTexCoord(GetTexCoordsForRole(role));
+			button.RoleIcon:SetAtlas(GetMicroIconForRole(role), TextureKitConstants.IgnoreAtlasSize);
 			button.RoleIcon:SetDesaturated(not allowed);
 			button.RoleName:SetText(_G["ROLE_"..role]);
 			button:SetEnabled(allowed);
@@ -638,10 +638,7 @@ CharacterUpgradeFlow = Mixin(
 			[2] = CharacterUpgradeSpecSelectBlock,
 			[3] = CharacterUpgradeFactionSelectBlock,
 			[4] = CharacterUpgradeEndStep,
-		},
-
-		theme = "default",
-		DisableButtons = true
+		}
 	},
 	CharacterServicesFlowMixin
 );
@@ -701,10 +698,6 @@ function CharacterUpgradeFlow:ShouldSkipSpecSelect()
 
 	local experienceLevel = select(7, GetCharacterInfo(results.charid));
 	return experienceLevel >= self.data.level;
-end
-
-function CharacterUpgradeFlow:UsesSelector()
-	return true;
 end
 
 function CharacterUpgradeFlow:Initialize(controller)
@@ -1045,15 +1038,21 @@ RPEUpgradeFlow = Mixin(
 			[2] = RPEUpgradeSpecSelectBlock
 		},
 
-		theme = "RPE",
-		MinimizedFrame = "RPEUpgradeMinimizedFrame",
-		DisableButtons = false
+		MinimizedFrame = "RPEUpgradeMinimizedFrame"
 	},
 	CharacterServicesFlowMixin
 );
 
 function RPEUpgradeFlow:Initialize(controller)
 	CharacterServicesFlowMixin.Initialize(self, controller);
+end
+
+function RPEUpgradeFlow:GetTheme()
+	return "RPE";
+end
+
+function RPEUpgradeFlow:ShouldDisableButtons()
+	return false;
 end
 
 function RPEUpgradeFlow:GetFinishLabel()
@@ -1064,18 +1063,35 @@ function RPEUpgradeFlow:UsesSelector()
 	return false;
 end
 
+local function SetKeepQuestsAndContinue(keepQuests)
+	return function()
+		GlueDialog.data.keepQuests = keepQuests;
+		GlueDialog_Show("RPE_UPGRADE_CONFIRM", nil, GlueDialog.data);
+		CharSelectServicesFlowFrame:Hide()
+    end
+end
+
+GlueDialogTypes["RPE_UPGRADE_QUEST_CLEAR_CONFIRM"] = {
+    text = RPE_UPGRADE_QUEST_CLEAR_CONFIRMATION,
+    button1 = RPE_CLEAR_QUESTS,
+    button2 = RPE_KEEP_QUESTS,
+    OnAccept = SetKeepQuestsAndContinue(false),
+    OnCancel = SetKeepQuestsAndContinue(true),
+}
+
 GlueDialogTypes["RPE_UPGRADE_CONFIRM"] = {
     text = RPE_UPGRADE_CONFIRMATION,
     button1 = RPE_CONFIRM,
     button2 = CANCEL,
-    OnAccept = function ()
+    OnAccept = function()
         local results = GlueDialog.data;
-		C_CharacterServices.RPEResetCharacter(results.playerguid, results.faction, results.spec);
+		C_CharacterServices.RPEResetCharacter(results.playerguid, results.faction, results.spec, results.keepQuests);
+		CharacterSelect_UpdateCharacterMatchingGUID(results.playerguid); --update the character button so it says 'processing'
     end,
-    OnCancel = function ()
-        BeginCharacterServicesFlow(RPEUpgradeFlow, {});
-		CharacterServicesMaster.flow:Advance(CharacterServicesMaster); --put it back in the spec select state
-    end,
+    OnCancel = function()
+		BeginCharacterServicesFlow(RPEUpgradeFlow, {});
+		CharacterServicesMaster.flow:Advance(CharacterServicesMaster); 
+	end,
 }
 
 function RPEUpgradeFlow:Finish(controller)
@@ -1095,9 +1111,17 @@ function RPEUpgradeFlow:Finish(controller)
 	CharacterServicesMaster.pendingGuid = results.playerguid;
 
 	ValidateSpec(results);
-	GlueDialog_Show("RPE_UPGRADE_CONFIRM", nil, results);
-	return true;
+	local questClearAvailable = select(37, GetCharacterInfo(results.charid));
+	if questClearAvailable then
+		GlueDialog_Show("RPE_UPGRADE_QUEST_CLEAR_CONFIRM", nil, results);
+		return false; --flow will be closed by the RPE_UPGRADE_QUEST_CLEAR_CONFIRM dialog.
+	else
+		results.keepQuests = true;
+		GlueDialog_Show("RPE_UPGRADE_CONFIRM", nil, results);
+		return true;
+	end
 end
+
 
 local RPEUPgradeInfoBlockSubFrameText = {
 	Line1 = "RPE_INFO_TEXT1", 
@@ -1142,12 +1166,12 @@ function RPEUPgradeInfoBlock:IsFinished()
 	return true;
 end
 
+function RPEUPgradeInfoBlock:OnHide()
+  --intentionally left blank
+end
+
 function RPEUPgradeInfoBlock:ShouldShowPopup()
-	local _, _, raceFilename = GetCharacterInfo(self.charid);
-	local raceData = C_CharacterCreation.GetRaceDataByID(C_CharacterCreation.GetRaceIDFromName(raceFilename));
-	local seenPopupBefore = self.seenPopup;
-	self.seenPopup = true;
-	return raceData.isAlliedRace and not raceData.hasHeritageArmor and not seenPopupBefore;
+	return false;
 end
 
 function RPEUPgradeInfoBlock:OnAdvance()

@@ -567,7 +567,7 @@ function ScrollBoxListMixin:FindElementDataByPredicate(predicate)
 end
 
 function ScrollBoxListMixin:FindElementDataIndex(elementData)
-	return self:GetView():FindElementDataIndex(predicate);
+	return self:GetView():FindElementDataIndex(elementData);
 end
 
 function ScrollBoxListMixin:FindElementDataIndexByPredicate(predicate)
@@ -604,8 +604,12 @@ function ScrollBoxListMixin:HasDataProvider()
 	return self:GetView():HasDataProvider();
 end
 
-function ScrollBoxListMixin:ClearDataProvider()
-	self:GetView():ClearDataProvider();
+function ScrollBoxListMixin:RemoveDataProvider()
+	self:GetView():RemoveDataProvider();
+end
+
+function ScrollBoxListMixin:FlushDataProvider()
+	self:GetView():FlushDataProvider();
 end
 
 function ScrollBoxListMixin:GetDataIndexBegin()

@@ -131,12 +131,20 @@ function TransmogFrameMixin:OnEvent(event, ...)
 		end
 	elseif ( event == "UNIT_FORM_CHANGED" ) then
 		local unit = ...;
-		if ( unit == "player" and IsUnitModelReadyForUI("player") ) then
-			local hasAlternateForm, inAlternateForm = C_PlayerInfo.GetAlternateFormInfo();
-			if ( self.inAlternateForm ~= inAlternateForm ) then
-				self.inAlternateForm = inAlternateForm;
-				self:RefreshPlayerModel();
-			end
+		if ( unit == "player" ) then
+			self:HandleFormChanged();
+		end
+	end
+end
+
+function TransmogFrameMixin:HandleFormChanged()
+	self.needsFormChangedHandling = true;
+	if IsUnitModelReadyForUI("player") then
+		local hasAlternateForm, inAlternateForm = C_PlayerInfo.GetAlternateFormInfo();
+		if ( self.inAlternateForm ~= inAlternateForm ) then
+			self.inAlternateForm = inAlternateForm;
+			self:RefreshPlayerModel();
+			self.needsFormChangedHandling = false;
 		end
 	end
 end
@@ -173,6 +181,10 @@ end
 function TransmogFrameMixin:OnUpdate()
 	if self.dirty then
 		self:Update();
+	end
+
+	if self.needsFormChangedHandling then
+		self:HandleFormChanged();
 	end
 end
 
@@ -929,7 +941,7 @@ local TAB_SETS = 2;
 local TABS_MAX_WIDTH = 185;
 
 local WARDROBE_MODEL_SETUP = {
-	["HEADSLOT"] 		= { useTransmogSkin = false, useTransmogChoices = false, obeyHideInTransmogFlag = true, slots = { CHESTSLOT = true,  HANDSSLOT = false, LEGSSLOT = false, FEETSLOT = false, HEADSLOT = false } },
+	["HEADSLOT"] 		= { useTransmogSkin = false, useTransmogChoices = false, obeyHideInTransmogFlag = false, slots = { CHESTSLOT = true,  HANDSSLOT = false, LEGSSLOT = false, FEETSLOT = false, HEADSLOT = false } },
 	["SHOULDERSLOT"]	= { useTransmogSkin = true,  useTransmogChoices = true,  obeyHideInTransmogFlag = true,  slots = { CHESTSLOT = false, HANDSSLOT = false, LEGSSLOT = false, FEETSLOT = false, HEADSLOT = true  } },
 	["BACKSLOT"]		= { useTransmogSkin = true,  useTransmogChoices = true,  obeyHideInTransmogFlag = true,  slots = { CHESTSLOT = false, HANDSSLOT = false, LEGSSLOT = false, FEETSLOT = false, HEADSLOT = true  } },
 	["CHESTSLOT"]		= { useTransmogSkin = true,  useTransmogChoices = true,  obeyHideInTransmogFlag = true,  slots = { CHESTSLOT = false, HANDSSLOT = false, LEGSSLOT = false, FEETSLOT = false, HEADSLOT = true  } },
@@ -1135,13 +1147,7 @@ function WardrobeCollectionFrameMixin:OnEvent(event, ...)
 			self.ItemsCollectionFrame:ValidateChosenVisualSources();
 		end
 	elseif ( event == "UNIT_FORM_CHANGED" ) then
-		local hasAlternateForm, inAlternateForm = C_PlayerInfo.GetAlternateFormInfo();
-		if ( (self.inAlternateForm ~= inAlternateForm or self.updateOnModelChanged) ) then
-			if ( self.activeFrame:OnUnitModelChangedEvent() ) then
-				self.inAlternateForm = inAlternateForm;
-				self.updateOnModelChanged = nil;
-			end
-		end
+		self:HandleFormChanged();
 	elseif ( event == "PLAYER_LEVEL_UP" or event == "SKILL_LINES_CHANGED" or event == "UPDATE_FACTION" or event == "SPELLS_CHANGED" ) then
 		self:UpdateUsableAppearances();
 	elseif ( event == "TRANSMOG_SEARCH_UPDATED" ) then
@@ -1153,6 +1159,26 @@ function WardrobeCollectionFrameMixin:OnEvent(event, ...)
 		self:RestartSearchTracking();
 	elseif ( event == "UI_SCALE_CHANGED" or event == "DISPLAY_SIZE_CHANGED" or event == "TRANSMOG_COLLECTION_CAMERA_UPDATE" ) then
 		self:RefreshCameras();
+	end
+end
+
+function WardrobeCollectionFrameMixin:HandleFormChanged()
+	local hasAlternateForm, inAlternateForm = C_PlayerInfo.GetAlternateFormInfo();
+	self.needsFormChangedHandling = false;
+	if ( self.inAlternateForm ~= inAlternateForm or self.updateOnModelChanged ) then
+		if ( self.activeFrame:OnUnitModelChangedEvent() ) then
+			self.inAlternateForm = inAlternateForm;
+			self.updateOnModelChanged = nil;
+		else
+			self.needsFormChangedHandling = true;
+		end
+	end
+end
+
+
+function WardrobeCollectionFrameMixin:OnUpdate()
+	if self.needsFormChangedHandling then
+		self:HandleFormChanged();
 	end
 end
 
@@ -1174,7 +1200,9 @@ function WardrobeCollectionFrameMixin:OnShow()
 	local hasAlternateForm, inAlternateForm = C_PlayerInfo.GetAlternateFormInfo();
 	self.inAlternateForm = inAlternateForm;
 
-	if C_Transmog.IsAtTransmogNPC() then
+	local isAtTransmogNPC = C_Transmog.IsAtTransmogNPC();
+	self.InfoButton:SetShown(not isAtTransmogNPC);
+	if isAtTransmogNPC then
 		self:SetTab(self.selectedTransmogTab);
 	else
 		self:SetTab(self.selectedCollectionTab);
@@ -1272,13 +1300,27 @@ function WardrobeCollectionFrameMixin:UpdateTabButtons()
 	self.SetsTab.FlashFrame:SetShown(C_TransmogSets.GetLatestSource() ~= Constants.Transmog.NoTransmogID and not C_Transmog.IsAtTransmogNPC());
 end
 
+local function IsAnySourceCollected(sources)
+	for i, source in ipairs(sources) do
+		if source.isCollected then
+			return true;
+		end
+	end
+
+	return false;
+end
+
 function WardrobeCollectionFrameMixin:SetAppearanceTooltip(contentFrame, sources, primarySourceID, warningString)
 	self.tooltipContentFrame = contentFrame;
 	local selectedIndex = self.tooltipSourceIndex;
 	local showUseError = true;
 	local inLegionArtifactCategory = TransmogUtil.IsCategoryLegionArtifact(self.ItemsCollectionFrame:GetActiveCategory());
 	local subheaderString = nil;
-	self.tooltipSourceIndex, self.tooltipCycle = CollectionWardrobeUtil.SetAppearanceTooltip(GameTooltip, sources, primarySourceID, selectedIndex, showUseError, inLegionArtifactCategory, subheaderString, warningString);
+	local showTrackingInfo = not IsAnySourceCollected(sources) and not C_Transmog.IsAtTransmogNPC();
+	if WardrobeCollectionFrame.activeFrame == WardrobeCollectionFrame.SetsCollectionFrame then
+		showTrackingInfo = false;
+	end
+	self.tooltipSourceIndex, self.tooltipCycle = CollectionWardrobeUtil.SetAppearanceTooltip(GameTooltip, sources, primarySourceID, selectedIndex, showUseError, inLegionArtifactCategory, subheaderString, warningString, showTrackingInfo);
 end
 
 function WardrobeCollectionFrameMixin:HideAppearanceTooltip()
@@ -1747,20 +1789,13 @@ function WardrobeItemsCollectionMixin:EvaluateSlotAllowed()
 		-- Any model will do, using the 1st
 	local model = self.Models[1];
 	self.slotAllowed = not isArmor or model:IsSlotAllowed(self.transmogLocation:GetSlotID());	
-	if model:IsGeoReady() then
-		self:SetScript("OnUpdate", nil);
-	else
-		-- Not likely to ever hit this, but just in case
-		self:SetScript("OnUpdate", self.OnUpdate);
+	if not model:IsGeoReady() then
+		self:MarkGeoDirty();
 	end
 end
 
-function WardrobeItemsCollectionMixin:OnUpdate()
-	local model = self.Models[1];
-	if model:IsGeoReady() then
-		self:EvaluateSlotAllowed();
-		self:UpdateItems();
-	end
+function WardrobeItemsCollectionMixin:MarkGeoDirty()
+	self.geoDirty = true;
 end
 
 function WardrobeItemsCollectionMixin:RefreshCameras()
@@ -2074,6 +2109,16 @@ function WardrobeItemsCollectionMixin:GetCameraVariation()
 end
 
 function WardrobeItemsCollectionMixin:OnUpdate()
+	if self.geoDirty then
+		local model = self.Models[1];
+		if model:IsGeoReady() then
+			self.geoDirty = nil;
+
+			self:EvaluateSlotAllowed();
+			self:UpdateItems();
+		end
+	end
+
 	if (self.trackingModifierDown and not ContentTrackingUtil.IsTrackingModifierDown()) or (not self.trackingModifierDown and ContentTrackingUtil.IsTrackingModifierDown()) then
 		for i, model in ipairs(self.Models) do
 			model:UpdateTrackingDisabledOverlay();
@@ -2510,9 +2555,7 @@ function WardrobeItemsModelMixin:UpdateContentTracking()
 
 	if ( self.visualInfo ) then
 		local itemsCollectionFrame = self:GetParent();
-		if ( itemsCollectionFrame.transmogLocation:IsIllusion() ) then
-			-- TODO:: Handle illusions.
-		else
+		if ( not itemsCollectionFrame.transmogLocation:IsIllusion() ) then
 			local sources = CollectionWardrobeUtil.GetSortedAppearanceSources(self.visualInfo.visualID, itemsCollectionFrame:GetActiveCategory(), itemsCollectionFrame.transmogLocation);
 			for i, sourceInfo in ipairs(sources) do
 				self:AddTrackable(Enum.ContentTrackingType.Appearance, sourceInfo.sourceID);
@@ -2524,7 +2567,13 @@ function WardrobeItemsModelMixin:UpdateContentTracking()
 end
 
 function WardrobeItemsModelMixin:UpdateTrackingDisabledOverlay()
-	self.DisabledOverlay:SetShown(ContentTrackingUtil.IsTrackingModifierDown() and not self:HasTrackableSource());
+	if ( not ContentTrackingUtil.IsContentTrackingEnabled() ) then
+		return;
+	end
+
+	local isCollected = self.visualInfo and self.visualInfo.isCollected;
+	local showDisabled = ContentTrackingUtil.IsTrackingModifierDown() and (isCollected or not self:HasTrackableSource());
+	self.DisabledOverlay:SetShown(showDisabled);
 end
 
 function WardrobeItemsModelMixin:GetSourceInfoForTracking()
@@ -2534,7 +2583,6 @@ function WardrobeItemsModelMixin:GetSourceInfoForTracking()
 
 	local itemsCollectionFrame = self:GetParent();
 	if ( itemsCollectionFrame.transmogLocation:IsIllusion() ) then
-		-- TODO:: Handle illusions.
 		return nil;
 	else
 		local sourceIndex = WardrobeCollectionFrame.tooltipSourceIndex or 1;
@@ -2547,19 +2595,9 @@ function WardrobeItemsModelMixin:GetSourceInfoForTracking()
 end
 
 function WardrobeItemsModelMixin:OnMouseDown(button)
-	if ( self.visualInfo and not self.visualInfo.isCollected ) then
-		local sourceInfo = self:GetSourceInfoForTracking();
-		if ( sourceInfo ) then
-			if ( self:CheckTrackableClick(button, Enum.ContentTrackingType.Appearance, sourceInfo.sourceID) ) then
-				self:UpdateContentTracking();
-				return;
-			end
-		end
-	end
-
 	local itemsCollectionFrame = self:GetParent();
-	itemsCollectionFrame:RefreshAppearanceTooltip();
-	if ( IsModifiedClick("CHATLINK") ) then
+	local isChatLinkClick = IsModifiedClick("CHATLINK");
+	if ( isChatLinkClick ) then
 		local link;
 		if ( itemsCollectionFrame.transmogLocation:IsIllusion() ) then
 			local name;
@@ -2572,11 +2610,27 @@ function WardrobeItemsModelMixin:OnMouseDown(button)
 			end
 		end
 		if ( link ) then
-			HandleModifiedItemClick(link);
+			if ( HandleModifiedItemClick(link) ) then
+				return;
+			end
 		end
-		return;
 	elseif ( IsModifiedClick("DRESSUP") ) then
 		itemsCollectionFrame:DressUpVisual(self.visualInfo);
+		return;
+	end
+
+	if ( self.visualInfo and not self.visualInfo.isCollected ) then
+		local sourceInfo = self:GetSourceInfoForTracking();
+		if ( sourceInfo ) then
+			if ( self:CheckTrackableClick(button, Enum.ContentTrackingType.Appearance, sourceInfo.sourceID) ) then
+				self:UpdateContentTracking();
+				itemsCollectionFrame:RefreshAppearanceTooltip();
+				return;
+			end
+		end
+	end
+
+	if ( isChatLinkClick ) then
 		return;
 	end
 
@@ -4155,27 +4209,31 @@ end
 function WardrobeSetsDetailsModelMixin:OnUpdate(elapsed)
 	if ( IsUnitModelReadyForUI("player") ) then
 		if ( self.rotating ) then
-			local x = GetCursorPosition();
-			local diff = (x - self.rotateStartCursorX) * MODELFRAME_DRAG_ROTATION_CONSTANT;
-			self.rotateStartCursorX = GetCursorPosition();
-			self.yaw = self.yaw + diff;
-			if ( self.yaw < 0 ) then
-				self.yaw = self.yaw + (2 * PI);
+			if ( self.yaw ) then
+				local x = GetCursorPosition();
+				local diff = (x - self.rotateStartCursorX) * MODELFRAME_DRAG_ROTATION_CONSTANT;
+				self.rotateStartCursorX = GetCursorPosition();
+				self.yaw = self.yaw + diff;
+				if ( self.yaw < 0 ) then
+					self.yaw = self.yaw + (2 * PI);
+				end
+				if ( self.yaw > (2 * PI) ) then
+					self.yaw = self.yaw - (2 * PI);
+				end
+				self:SetRotation(self.yaw, false);
 			end
-			if ( self.yaw > (2 * PI) ) then
-				self.yaw = self.yaw - (2 * PI);
-			end
-			self:SetRotation(self.yaw, false);
 		elseif ( self.panning ) then
-			local cursorX, cursorY = GetCursorPosition();
-			local modelX = self:GetPosition();
-			local panSpeedModifier = 100 * sqrt(1 + modelX - self.defaultPosX);
-			local modelY = self.panStartModelY + (cursorX - self.panStartCursorX) / panSpeedModifier;
-			local modelZ = self.panStartModelZ + (cursorY - self.panStartCursorY) / panSpeedModifier;
-			local limits = self:GetPanAndZoomLimits();
-			modelY = Clamp(modelY, limits.panMaxLeft, limits.panMaxRight);
-			modelZ = Clamp(modelZ, limits.panMaxBottom, limits.panMaxTop);
-			self:SetPosition(modelX, modelY, modelZ);
+			if ( self.defaultPosX ) then
+				local cursorX, cursorY = GetCursorPosition();
+				local modelX = self:GetPosition();
+				local panSpeedModifier = 100 * sqrt(1 + modelX - self.defaultPosX);
+				local modelY = self.panStartModelY + (cursorX - self.panStartCursorX) / panSpeedModifier;
+				local modelZ = self.panStartModelZ + (cursorY - self.panStartCursorY) / panSpeedModifier;
+				local limits = self:GetPanAndZoomLimits();
+				modelY = Clamp(modelY, limits.panMaxLeft, limits.panMaxRight);
+				modelZ = Clamp(modelZ, limits.panMaxBottom, limits.panMaxTop);
+				self:SetPosition(modelX, modelY, modelZ);
+			end
 		end
 	end
 end

@@ -52,6 +52,8 @@ FogOfWarDocumentation.lua
 FrameAPICinematicModelDocumentation.lua
 FrameAPICooldownDocumentation.lua
 FrameAPIFogOfWarFrameDocumentation.lua
+FrameAPIModelSceneFrameDocumentation.lua
+FrameAPIModelSceneFrameActorBaseDocumentation.lua
 FrameAPISimpleCheckoutDocumentation.lua
 FrameAPITabardModelBaseDocumentation.lua
 FrameAPIUnitPositionFrameDocumentation.lua
@@ -86,6 +88,8 @@ PartyInfoDocumentation.lua
 PartyPoseUIDocumentation.lua
 PetInfoDocumentation.lua
 PetJournalInfoDocumentation.lua
+PingManagerDocumentation.lua
+PingPinFrameAPIDocumentation.lua
 PlatformDocumentation.lua
 PlayerInfoDocumentation.lua
 PlayerInteractionManagerDocumentation.lua
@@ -209,6 +213,7 @@ FrameAPIArchaeologyDigsiteDocumentation.lua
 FrameAPIBlobDocumentation.lua
 FrameAPICharacterModelBaseDocumentation.lua
 FrameAPIDressUpModelDocumentation.lua
+FrameAPIModelSceneFrameActorDocumentation.lua
 FrameAPIQuestPOIDocumentation.lua
 FrameAPIScenarioPOIDocumentation.lua
 FrameAPITabardModelDocumentation.lua
@@ -272,6 +277,7 @@ BattlePetConstantsDocumentation.lua
 BountySharedDocumentation.lua
 ButtonConstantsDocumentation.lua
 CalendarConstantsDocumentation.lua
+CameraConstantsDocumentation.lua
 CharacterCustomizationSharedDocumentation.lua
 ChatConstantsDocumentation.lua
 ClubSharedDocumentation.lua
@@ -284,6 +290,7 @@ DamageConstantsDocumentation.lua
 EditModeManagerSharedDocumentation.lua
 EncounterJournalConstantsDocumentation.lua
 ExpansionLandingPageConstantsDocumentation.lua
+FrameAPIModelSceneFrameSharedDocumentation.lua
 GARRISON_FOLLOWER_TYPEConstantsDocumentation.lua
 GARRISON_TYPEConstantsDocumentation.lua
 GamePadConstDocumentation.lua
@@ -298,12 +305,13 @@ LevelConstantsDocumentation.lua
 LootConstantsDocumentation.lua
 MapConstantsDocumentation.lua
 MinimapConstantsDocumentation.lua
-ModelSceneDocumentation.lua
+ModelAnimationSharedDocumentation.lua
 NamePlateDocumentation.lua
 PVPMgrConstantsDocumentation.lua
 PerksVendorConstantsDocumentation.lua
 PetBattleConstantsDocumentation.lua
 PetScalingConstantsDocumentation.lua
+PingConstantsDocumentation.lua
 PlayerDocumentation.lua
 PlayerInfoSharedDocumentation.lua
 PlayerInteractionManagerConstantsDocumentation.lua

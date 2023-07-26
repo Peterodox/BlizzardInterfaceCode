@@ -176,9 +176,8 @@ function SettingsPanelMixin:OnAttributeChanged(name, value)
 		self:OnSettingValueChanged(setting, newValue, oldValue, originalValue);
 	elseif name == SettingsInbound.RepairDisplayAttribute then
 		self:RepairDisplay();
-	elseif name == SettingsInbound.SetCurrentLayout then
-		local layout = SecureUnpackArgs(value);
-		self:SetCurrentLayout(layout);
+	elseif name == SettingsInbound.SetCurrentLayoutAttribute then
+		self:SetCurrentLayout(value);
 	end
 end
 
@@ -308,12 +307,19 @@ function SettingsPanelMixin:Close(skipTransitionBackToOpeningPanel)
 end
 
 function SettingsPanelMixin:ExitWithoutCommit()
+	local settingsToRevert = {};
+
 	for setting, record in pairs(self.modified) do
 		-- The settings under affect of IgnoreApply flag shouldn't be in the self.modified table after having been applied
 		-- Needs bug investigation
 		if (securecallfunction(setting.HasCommitFlag, setting, Settings.CommitFlag.Revertable) or securecallfunction(setting.HasCommitFlag, setting, Settings.CommitFlag.Apply)) and not securecallfunction(setting.HasCommitFlag, setting, Settings.CommitFlag.IgnoreApply) then
-			securecallfunction(setting.Revert, setting);
+			--store the setting we want to revert and do it outside of this loop so we can avoid any invalid key errors
+			table.insert(settingsToRevert, setting);
 		end
+	end
+
+	for i, setting in ipairs(settingsToRevert) do
+		securecallfunction(setting.Revert, setting);
 	end
 
 	self:Flush();

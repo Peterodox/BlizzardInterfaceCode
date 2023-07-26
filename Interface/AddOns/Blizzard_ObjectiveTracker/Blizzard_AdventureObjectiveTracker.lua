@@ -9,7 +9,8 @@ local NavigableContentTrackingTargets = {
 ADVENTURE_TRACKER_MODULE = ObjectiveTracker_GetModuleInfoTable("ADVENTURE_TRACKER_MODULE");
 ADVENTURE_TRACKER_MODULE.updateReasonModule = 	OBJECTIVE_TRACKER_UPDATE_MODULE_ADVENTURE;
 ADVENTURE_TRACKER_MODULE.updateReasonEvents = 	OBJECTIVE_TRACKER_UPDATE_TARGET_INFO +
-												OBJECTIVE_TRACKER_UPDATE_TRANSMOG_COLLECTED;
+												OBJECTIVE_TRACKER_UPDATE_TRANSMOG_COLLECTED +
+												OBJECTIVE_TRACKER_UPDATE_SUPER_TRACK_CHANGED;
 ADVENTURE_TRACKER_MODULE:SetHeader(ObjectiveTrackerFrame.BlocksFrame.AdventureHeader, ADVENTURE_TRACKING_MODULE_HEADER_TEXT, nil);
 
 local LINE_TYPE_ANIM = { template = "QuestObjectiveAnimLineTemplate", freeLines = { } };
@@ -179,7 +180,7 @@ function ADVENTURE_TRACKER_MODULE:ProcessTrackingEntry(trackableType, trackableI
 
 		local objectiveText = C_ContentTracking.GetObjectiveText(targetType, targetID);
 		if objectiveText then
-			block.objective = self:AddObjective(block, 1, objectiveText, LINE_TYPE_ANIM, nil, OBJECTIVE_DASH_STYLE_SHOW, OBJECTIVE_TRACKER_COLOR["Normal"]);
+			block.objective = self:AddObjective(block, 1, objectiveText, LINE_TYPE_ANIM, true, OBJECTIVE_DASH_STYLE_SHOW, OBJECTIVE_TRACKER_COLOR["Normal"]);
 		else
 			block.objective = self:AddObjective(block, 1, CONTENT_TRACKING_RETRIEVING_INFO, LINE_TYPE_ANIM, nil, OBJECTIVE_DASH_STYLE_HIDE, OBJECTIVE_TRACKER_COLOR["Normal"]);
 		end
@@ -194,6 +195,15 @@ function ADVENTURE_TRACKER_MODULE:ProcessTrackingEntry(trackableType, trackableI
 					if (navigableTrackingResult == Enum.ContentTrackingResult.Failure) or
 						(navigableTrackingResult == Enum.ContentTrackingResult.Success and not isNavigable) then
 						self:AddObjective(block, 2, CONTENT_TRACKING_ROUTE_UNAVAILABLE, nil, nil, OBJECTIVE_DASH_STYLE_HIDE, OBJECTIVE_TRACKER_COLOR["Normal"]);
+					else
+						local superTrackedType, superTrackedID = C_SuperTrack.GetSuperTrackedContent();
+						if (trackableType == superTrackedType) and (trackableID == superTrackedID) then
+							local waypointText = C_ContentTracking.GetWaypointText(trackableType, trackableID);
+							if waypointText then
+								local formattedText = OPTIONAL_QUEST_OBJECTIVE_DESCRIPTION:format(waypointText);
+								self:AddObjective(block, 2, formattedText, nil, nil, OBJECTIVE_DASH_STYLE_SHOW, OBJECTIVE_TRACKER_COLOR["Normal"]);
+							end
+						end
 					end
 				end
 			end
@@ -258,8 +268,13 @@ function ADVENTURE_TRACKER_MODULE:StopTrackingCollectedItems()
 		return;
 	end
 
+	local removingCollectedObjective = false;
 	for trackableId, trackableType in pairs(self.collectedIds) do
-		C_ContentTracking.StopTracking(trackableType, trackableId)
+		C_ContentTracking.StopTracking(trackableType, trackableId);
+		removingCollectedObjective = true;
+	end
+	if removingCollectedObjective then
+		PlaySound(SOUNDKIT.CONTENT_TRACKING_OBJECTIVE_TRACKING_END);
 	end
 	self.collectedIds = nil;
 end
@@ -275,10 +290,12 @@ function ADVENTURE_TRACKER_MODULE:OnTrackableItemCollected(trackableType, tracka
 		block.objective.block = block;
 		block.objective.state = "ANIMATING";
 		AdventureObjectiveTracker_AnimateReward(trackableID, block, block.posIndex, self);
+		PlaySound(SOUNDKIT.CONTENT_TRACKING_ITEM_ACQUIRED_TOAST);
 	elseif C_ContentTracking.IsTracking(trackableType, trackableID) then
 		--If no block is found, but we are tracking the item, show animation at the bottom of the objective tracker
 		AdventureObjectiveTracker_AnimateReward(trackableID, ObjectiveTrackerFrame, 0, self);
 		AdventureObjectiveTrackerBonusRewardsFrame:SetPoint("TOPRIGHT", ObjectiveTrackerFrame, "BOTTOMLEFT", 20, 16);
+		PlaySound(SOUNDKIT.CONTENT_TRACKING_ITEM_ACQUIRED_TOAST);
 	end
 
 	if not self.collectedIds then
@@ -287,15 +304,27 @@ function ADVENTURE_TRACKER_MODULE:OnTrackableItemCollected(trackableType, tracka
 	self.collectedIds[trackableID] = trackableType;
 end
 
+function ADVENTURE_TRACKER_MODULE:RefreshAll()
+	self:BeginLayout();
+	self:EnumerateTrackables(GenerateClosure(self.ProcessTrackingEntry, self));
+	self:EndLayout();
+end
+
 function ADVENTURE_TRACKER_MODULE:Update()
-	if OBJECTIVE_TRACKER_UPDATE_REASON == OBJECTIVE_TRACKER_UPDATE_TRANSMOG_COLLECTED then
+	if not ContentTrackingUtil.IsContentTrackingEnabled() then
+		self:BeginLayout();
+		self:EndLayout();
+		return;
+	end
+
+	if OBJECTIVE_TRACKER_UPDATE_REASON == OBJECTIVE_TRACKER_UPDATE_SUPER_TRACK_CHANGED then
+		self:RefreshAll();
+		return;
+	elseif OBJECTIVE_TRACKER_UPDATE_REASON == OBJECTIVE_TRACKER_UPDATE_TRANSMOG_COLLECTED then
 		self:OnTrackableItemCollected(Enum.ContentTrackingType.Appearance, OBJECTIVE_TRACKER_UPDATE_ID);
 		return;
 	end
 
 	self:StopTrackingCollectedItems();
-
-	self:BeginLayout();
-	self:EnumerateTrackables(GenerateClosure(self.ProcessTrackingEntry, self));
-	self:EndLayout();
+	self:RefreshAll();
 end

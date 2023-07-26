@@ -1375,7 +1375,7 @@
 		end
 	</Binding>
 	<Binding name="TOGGLEFPS" category="BINDING_HEADER_MISC">
-		ToggleFramerate();
+		FramerateFrame:Toggle();
 	</Binding>
 	<Binding name="SCREENSHOT" category="BINDING_HEADER_MISC">
 		Screenshot();
@@ -1406,6 +1406,15 @@
 	</Binding>
 	<Binding name="TOGGLEWINDOWED" category="BINDING_HEADER_MISC">
 		ToggleWindowed();
+	</Binding>
+	<Binding name="TOGGLEPINGLISTENER" runOnUp="true" category="BINDING_HEADER_MISC">
+		PingUI_LoadUI();
+		if ( keystate == "down" ) then
+			PingListenerFrame:Show();
+		else
+			PingListenerFrame:CancelPendingPing();
+			PingListenerFrame:Hide();
+		end
 	</Binding>
 
 	<!-- Debug function key bindings -->
