@@ -1,7 +1,6 @@
 --------------------------------------------------
 -- DRESS UP MODEL FRAME RESET BUTTON MIXIN
 DressUpModelFrameResetButtonMixin = {};
-
 function DressUpModelFrameResetButtonMixin:OnLoad()
 	self.modelScene = self:GetParent().ModelScene;
 end
@@ -9,14 +8,13 @@ end
 function DressUpModelFrameResetButtonMixin:OnClick()
 	local itemModifiedAppearanceIDs = nil;
 	local forcePlayerRefresh = true;
-	DressUpFrame_Show(self:GetParent(), itemModifiedAppearanceIDs, forcePlayerRefresh)
+	DressUpFrame_Show(self:GetParent(), itemModifiedAppearanceIDs, forcePlayerRefresh, self:GetParent():GetLastLink())
 	PlaySound(SOUNDKIT.GS_TITLE_OPTION_OK);
 end
 
 --------------------------------------------------
 -- DRESS UP MODEL FRAME LINK BUTTON MIXIN
 DressUpModelFrameLinkButtonMixin = {};
-
 function DressUpModelFrameLinkButtonMixin:OnShow()
 	if not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_LINK_TRANSMOG_OUTFIT) then
 		local helpTipInfo = {
@@ -88,7 +86,6 @@ end
 --------------------------------------------------
 -- DRESS UP MODEL FRAME CLOSE BUTTON MIXIN
 DressUpModelFrameCloseButtonMixin = {};
-
 function DressUpModelFrameCloseButtonMixin:OnClick()
 	HideUIPanel(self:GetParent());
 end
@@ -97,7 +94,6 @@ end
 --------------------------------------------------
 -- DRESS UP MODEL FRAME CANCEL BUTTON MIXIN
 DressUpModelFrameCancelButtonMixin = {};
-
 function DressUpModelFrameCancelButtonMixin:OnClick()
 	HideParentPanel(self);
 end
@@ -106,7 +102,6 @@ end
 --------------------------------------------------
 -- DRESS UP MODEL FRAME MAX MIN MIXIN
 DressUpModelFrameMaximizeMinimizeMixin = {};
-
 function DressUpModelFrameMaximizeMinimizeMixin:OnLoad()
 	local function OnMaximize(frame)
 		local isMinimized = false;
@@ -128,6 +123,23 @@ end
 --------------------------------------------------
 -- BASE MODEL FRAME FRAME MIXIN
 DressUpModelFrameBaseMixin = { };
+function DressUpModelFrameBaseMixin:OnLoad()
+	self.ModelScene:SetResetCallback(GenerateClosure(self.OnModelSceneReset, self));
+end
+
+function DressUpModelFrameBaseMixin:GetLastLink()
+	return self.lastLink;
+end
+
+function DressUpModelFrameBaseMixin:SetLastLink(link)
+	self.lastLink = link;
+end
+
+function DressUpModelFrameBaseMixin:OnModelSceneReset()
+	if self.lastLink then
+		DressUpLink(self.lastLink, self);
+	end
+end
 
 function DressUpModelFrameBaseMixin:SetMode(mode)
 	self.mode = mode;
@@ -152,9 +164,11 @@ end
 --------------------------------------------------
 -- DEFAULT MODEL FRAME FRAME MIXIN
 DressUpModelFrameMixin = CreateFromMixins(DressUpModelFrameBaseMixin);
-
 function DressUpModelFrameMixin:OnLoad()
+	DressUpModelFrameBaseMixin.OnLoad(self);
 	self:SetTitle(DRESSUP_FRAME);
+
+	self.ModelScene.ControlFrame:SetModelScene(self.ModelScene);
 end
 
 function DressUpModelFrameMixin:OnShow()
@@ -226,6 +240,10 @@ end
 --------------------------------------------------
 -- SIDE DRESS UP MODEL FRAME FRAME MIXIN
 SideDressUpModelFrameFrameMixin = CreateFromMixins(DressUpModelFrameBaseMixin);
+function SideDressUpModelFrameFrameMixin:OnLoad()
+	DressUpModelFrameBaseMixin.OnLoad(self);
+	self.ModelScene.ControlFrame:SetModelScene(self.ModelScene);
+end
 
 function SideDressUpModelFrameFrameMixin:OnShow()
 	SetUIPanelAttribute(self.parentFrame, "width", self.openWidth);
@@ -239,9 +257,12 @@ function SideDressUpModelFrameFrameMixin:OnHide()
 	PlaySound(SOUNDKIT.IG_CHARACTER_INFO_CLOSE);
 end
 
+--------------------------------------------------
+-- TRANSMOG AND MOUNT DRESS UP MODEL FRAME FRAME MIXIN
 TransmogAndMountDressupFrameMixin = CreateFromMixins(DressUpModelFrameBaseMixin);
-
 function TransmogAndMountDressupFrameMixin:OnLoad()
+	DressUpModelFrameBaseMixin.OnLoad(self);
+
 	local checkButton = self.ShowMountCheckButton;
 	checkButton.Text:SetFontObject("GameFontNormal");
 	checkButton.Text:ClearAllPoints();

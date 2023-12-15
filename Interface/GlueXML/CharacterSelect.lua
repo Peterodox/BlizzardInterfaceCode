@@ -195,10 +195,15 @@ function CharacterSelect_OnLoad(self)
 	view:SetPadding(pad, pad, left, pad, spacing);
 
 	ScrollUtil.InitScrollBoxListWithScrollBar(CharacterSelectCharacterFrame.ScrollBox, CharacterSelectCharacterFrame.ScrollBar, view);
-	
+
 	do
 		local function Initializer(button, elementData)
 			CharacterSelect_InitCharacterButton(button, elementData);
+			button:SetScript("OnEnter", nil);
+			button:SetScript("OnLeave", nil);
+			button.buttonText.Location:SetScript("OnEnter", nil);
+			button.buttonText.Location:SetScript("OnLeave", nil);
+			button.buttonText.Location:SetScript("OnMouseUp", nil);
 			button.selection:Hide();
 			button.drag:Show();
 		end
@@ -245,7 +250,7 @@ function CharacterSelect_OnLoad(self)
 		end);
 	end
 
-	-- Assigning an empty data provider to prevent any scroll box related access errors due to race conditions. 
+	-- Assigning an empty data provider to prevent any scroll box related access errors due to race conditions.
 	-- When the actual character data arrives, this data provider will be discarded.
 	CharacterSelectCharacterFrame.ScrollBox:SetDataProvider(CreateDataProvider());
 end
@@ -359,8 +364,8 @@ function CharacterSelect_OnShow(self)
     C_StoreGlue.UpdateVASPurchaseStates();
 
     if (not STORE_IS_LOADED) then
-        STORE_IS_LOADED = LoadAddOn("Blizzard_StoreUI")
-        LoadAddOn("Blizzard_AuthChallengeUI");
+        STORE_IS_LOADED = C_AddOns.LoadAddOn("Blizzard_StoreUI")
+        C_AddOns.LoadAddOn("Blizzard_AuthChallengeUI");
     end
 
     CharacterSelect_ConditionallyLoadAccountSaveUI();
@@ -1043,7 +1048,7 @@ function CharacterSelect_InitCharacterButton(button, elementData)
 				else
 					if IsRPEBoostEligible(GetCharIDFromIndex(button.index)) then
 						locationText:SetFontObject("GlueFontHighlightSmall");
-						locationText:SetText(RPE_GEAR_UPDATE_GREEN); 
+						locationText:SetText(RPE_GEAR_UPDATE_GREEN);
 					else
 						locationText:SetFontObject("GlueFontDisableSmall");
 						locationText:SetText(zone);
@@ -1344,11 +1349,11 @@ function CharacterSelectButton_ShowMoveButtons(button)
 	if ( numCharacters <= 1 ) then
 		return;
 	end
-	
+
 	if not CharacterSelect_CanReorderCharacter() then
 		return;
 	end
-	
+
 	button.upButton:Show();
 	button.upButton.normalTexture:SetPoint("CENTER", 0, 0);
 	button.upButton.highlightTexture:SetPoint("CENTER", 0, 0);
@@ -1362,7 +1367,7 @@ function CharacterSelectButton_ShowMoveButtons(button)
 	    button.upButton:Enable();
 	    button.upButton:SetAlpha(1);
 	end
-	
+
 	if ( button.index == numCharacters ) then
 	    button.downButton:Disable();
 	    button.downButton:SetAlpha(0.35);
@@ -1655,7 +1660,10 @@ function CharacterSelectScrollUp_OnClick()
 end
 
 function LocationText_OnEnter(self)
-	local index = self:GetParent():GetParent().index;
+	local characterButton = self:GetParent():GetParent();
+	CharacterSelectButton_OnEnter(characterButton);
+
+	local index = characterButton.index;
 	if IsRPEBoostEligible(GetCharIDFromIndex(index)) then
 		local tooltip = GetAppropriateTooltip();
 		tooltip:SetOwner(self, "ANCHOR_LEFT", -16, -22);
@@ -1666,7 +1674,20 @@ function LocationText_OnEnter(self)
 end
 
 function LocationText_OnLeave(self)
-	 GetAppropriateTooltip():Hide();
+	GetAppropriateTooltip():Hide();
+
+	local characterButton = self:GetParent():GetParent();
+	characterButton:UnlockHighlight();
+	if ( GetMouseFocus() ~= characterButton ) then
+		CharacterSelectButton_OnLeave(characterButton);
+	end
+end
+
+function LocationText_OnMouseUp(self, button, upInside)
+	if button == "LeftButton" and upInside then
+		local characterButton = self:GetParent():GetParent();
+		CharacterSelectButton_OnClick(characterButton);
+	end
 end
 
 function CharacterSelectButton_OnEnter(self)
@@ -1683,6 +1704,11 @@ function CharacterSelectButton_OnEnter(self)
 end
 
 function CharacterSelectButton_OnLeave(self)
+	if ( GetMouseFocus() == self.buttonText.Location ) then
+		self:LockHighlight();
+		return;
+	end
+
 	if ( self.upButton:IsShown() and not (self.upButton:IsMouseOver() or self.downButton:IsMouseOver()) ) then
 		self.upButton:Hide();
 		self.downButton:Hide();
@@ -1996,8 +2022,8 @@ end
 
 function ToggleStoreUI()
 	if (not STORE_IS_LOADED) then
-		STORE_IS_LOADED = LoadAddOn("Blizzard_StoreUI")
-		LoadAddOn("Blizzard_AuthChallengeUI");
+		STORE_IS_LOADED = C_AddOns.LoadAddOn("Blizzard_StoreUI")
+		C_AddOns.LoadAddOn("Blizzard_AuthChallengeUI");
 	end
 
     if (STORE_IS_LOADED) then
@@ -2012,8 +2038,8 @@ end
 
 function SetStoreUIShown(shown)
 	if (not STORE_IS_LOADED) then
-		STORE_IS_LOADED = LoadAddOn("Blizzard_StoreUI")
-		LoadAddOn("Blizzard_AuthChallengeUI");
+		STORE_IS_LOADED = C_AddOns.LoadAddOn("Blizzard_StoreUI")
+		C_AddOns.LoadAddOn("Blizzard_AuthChallengeUI");
 	end
 
 	if (STORE_IS_LOADED) then
@@ -2113,7 +2139,7 @@ function CharacterSelect_UpdateButtonState()
     local undeleting = CharacterSelect.undeleting;
     local undeleteEnabled, undeleteOnCooldown = GetCharacterUndeleteStatus();
     local redemptionInProgress = AccountReactivationInProgressDialog:IsShown() or GoldReactivateConfirmationDialog:IsShown() or TokenReactivateConfirmationDialog:IsShown();
-    local inCompetitiveMode = IsCompetitiveModeEnabled();
+    local inCompetitiveMode = Kiosk.IsCompetitiveModeEnabled();
 	local inKioskMode = Kiosk.IsEnabled();
     local boostInProgress = select(19,GetCharacterInfo(GetCharacterSelection()));
     local isAccountLocked = CharacterSelect_IsAccountLocked();
@@ -2188,11 +2214,11 @@ end
 function CharacterSelect_ConditionallyLoadAccountSaveUI()
     if (C_AccountServices.IsAccountSaveEnabled()) then
         if (not ACCOUNT_SAVE_IS_LOADED) then
-            ACCOUNT_SAVE_IS_LOADED = LoadAddOn("Blizzard_AccountSaveUI");
+            ACCOUNT_SAVE_IS_LOADED = C_AddOns.LoadAddOn("Blizzard_AccountSaveUI");
         end
         if (AccountSaveFrame) then
             AccountSaveFrame:Show();
-            
+
             if (GameRoomBillingFrame:IsShown()) then
                 GameRoomBillingFrame:SetPoint("TOPLEFT", StoreButton, "TOPRIGHT");
             end
@@ -3213,8 +3239,9 @@ end
 
 function CopyCharacterCopy_OnClick(self)
     if ( not GlueDialog:IsShown() ) then
-		if ( CopyCharacterFrame.SelectedIndex ) then
-			local name, realm = GetAccountCharacterInfo(CopyCharacterFrame.SelectedIndex);
+		local selectedIndex = CopyCharacterFrame.SelectedIndex;
+		if ( selectedIndex and (selectedIndex <= GetNumAccountCharacters()) ) then
+			local name, realm = GetAccountCharacterInfo(selectedIndex);
 			GlueDialog_Show("COPY_CHARACTER", format(COPY_CHARACTER_CONFIRM, name, realm));
 		elseif ( IsGMClient() ) then
 			GlueDialog_Show("COPY_CHARACTER", format(COPY_CHARACTER_CONFIRM, CopyCharacterFrame.CharacterName:GetText(), CopyCharacterFrame.RealmName:GetText()));
@@ -3504,7 +3531,7 @@ end
 function CharSelectServicesFlowFrameMixin:Initialize(flow)
 	if not flow.MinimizedFrame then
 		self.IsMinimized = false; --flows that cant minimize should no longer be tracking that they are minimized.
-		if self.MinimizedFrame then 
+		if self.MinimizedFrame then
 			self.MinimizedFrame:Hide(); --any previously minimized frames should be hidden (will be cleared in CharSelectServicesFlowFrame:Initialize)
 		end
 	end

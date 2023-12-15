@@ -1,7 +1,3 @@
-local UpdateFrame = CreateFrame("FRAME", nil, UIParent);
-UpdateFrame.remaining = 0;
-UpdateFrame:Show();
-
 local ScrollBoxPad = 6;
 local ScrollBoxSpacing = 7;
 local ElementBonusRowHeight = 31;
@@ -50,11 +46,7 @@ function ProfessionsCraftingOutputLogElementMixin:Init()
 		self.ItemContainer.Item:SetItemButtonCount(resultData.quantity);
 		self.ItemContainer.Item:SetScript("OnEnter", function(button)
 			GameTooltip:SetOwner(self.ItemContainer.Item, "ANCHOR_RIGHT");
-			if resultData.preferHyperlink or not resultData.itemGUID then
-				GameTooltip:SetHyperlink(resultData.hyperlink);
-			else
-				GameTooltip:SetItemByGUID(resultData.itemGUID);
-			end
+			GameTooltip:SetHyperlink(resultData.hyperlink);
 		end);
 	end
 
@@ -251,6 +243,12 @@ ProfessionsCraftingOutputLogMixin:GenerateCallbackEvents(
 function ProfessionsCraftingOutputLogMixin:OnLoad()
 	CallbackRegistryMixin.OnLoad(self);
 	ScrollingFlatPanelMixin.OnLoad(self);
+	self:RegisterEvent("TRADE_SKILL_ITEM_CRAFTED_RESULT");
+	self:RegisterEvent("TRADE_SKILL_CURRENCY_REWARD_RESULT");
+
+	self.updateFrame = CreateFrame("FRAME", nil, UIParent);
+	self.updateFrame.remaining = 0;
+	self.updateFrame:Show();
 	
 	self.pendingResultData = {};
 
@@ -311,8 +309,8 @@ function ProfessionsCraftingOutputLogMixin:ProcessPendingResultData(resultData)
 
 	-- If we're expecting additional items, we're going to wait a small amount of time
 	-- for additional items or currencies (Artisan's Mettle, Knowledge XP, etc.) to be sent to us.
-	if UpdateFrame.remaining <= 0 then
-		UpdateFrame:SetScript("OnUpdate", function(updateFrame, dt)
+	if self.updateFrame.remaining <= 0 then
+		self.updateFrame:SetScript("OnUpdate", function(updateFrame, dt)
 			updateFrame.remaining = math.max(0, updateFrame.remaining - dt);
 			if updateFrame.remaining <= 0 then
 				updateFrame:SetScript("OnUpdate", nil);
@@ -321,7 +319,7 @@ function ProfessionsCraftingOutputLogMixin:ProcessPendingResultData(resultData)
 		end);
 		
 		local waitSeconds = .350;
-		UpdateFrame.remaining = waitSeconds;
+		self.updateFrame.remaining = waitSeconds;
 	end
 end
 
@@ -360,22 +358,6 @@ function ProfessionsCraftingOutputLogMixin:FinalizePendingResultData()
 		end
 	end
 
-	-- We may encounter the same itemGUID multiple times if the item was recrafted.
-	-- In those cases, opt to display the item tooltip via hyperlink instead of item guid.
-	-- The most recent item will continue to be displayed via item guid.
-	local found = {};
-	self.ScrollBox:ReverseForEachElementData(function(resultData)
-		local itemGUID = resultData.itemGUID;
-		if itemGUID then
-			local wasFound = found[itemGUID];
-			found[itemGUID] = true;
-
-			if wasFound then
-				resultData.preferHyperlink = true;
-			end
-		end
-	end);
-
 	self.pendingResultData = {};
 
 	if self:IsShown() then
@@ -388,10 +370,6 @@ function ProfessionsCraftingOutputLogMixin:FinalizePendingResultData()
 end
 
 function ProfessionsCraftingOutputLogMixin:OnHide()
-	self:UnregisterEvents();
-	self:UnregisterEvent("TRADE_SKILL_ITEM_CRAFTED_RESULT");
-	self:UnregisterEvent("TRADE_SKILL_CURRENCY_REWARD_RESULT");
-
 	self.ScrollBox:RemoveDataProvider();
 end
 
@@ -419,7 +397,7 @@ function ProfessionsCraftingOutputLogMixin:CalculateElementsHeight()
 	return height;
 end
 
-function ProfessionsCraftingOutputLogMixin:StartListening()
-	self:RegisterEvent("TRADE_SKILL_ITEM_CRAFTED_RESULT");
-	self:RegisterEvent("TRADE_SKILL_CURRENCY_REWARD_RESULT");
+function ProfessionsCraftingOutputLogMixin:Cleanup()
+	self.ScrollBox:Flush();
+	self:Hide();
 end

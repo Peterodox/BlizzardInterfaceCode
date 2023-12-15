@@ -196,10 +196,10 @@ MacMicrophoneAccessWarningMixin = {};
 
 function MacMicrophoneAccessWarningMixin:OnLoad()
 	self.OpenAccessButton:SetScript("OnClick", function(button, buttonName, down)
-		MacOptions_OpenMicrophoneRequestDialogue();
+		C_MacOptions.OpenMicrophoneRequestDialogue();
 	end);
 
-	self.Label:SetFormattedText(MAC_MIC_PREMISSIONS_NOTIFICATION, MacOptions_GetGameBundleName());
+	self.Label:SetFormattedText(MAC_MIC_PREMISSIONS_NOTIFICATION, C_MacOptions.GetGameBundleName());
 end
 
 local function InitVoiceSettings(category, layout)
@@ -219,7 +219,7 @@ local function InitVoiceSettings(category, layout)
 	end
 
 	-- System Prefs
-	if IsMacClient() and not MacOptions_IsMicrophoneEnabled() then
+	if IsMacClient() and not C_MacOptions.IsMicrophoneEnabled() then
 		local data = {};
 		local initializer = Settings.CreatePanelInitializer("MacMicrophoneAccessWarningTemplate", data);
 		layout:AddInitializer(initializer);
@@ -527,28 +527,7 @@ local function Register()
 	end
 
 	-- Ping System
-	do
-		if not IsOnGlueScreen() then
-			layout:AddInitializer(CreateSettingsListSectionHeaderInitializer(PING_SYSTEM_LABEL));
-
-			-- Enable Ping Sounds and Ping Volume
-			local enableSetting = Settings.RegisterCVarSetting(category, "Sound_EnablePingSounds", Settings.VarType.Boolean, ENABLE_PING_SOUNDS);
-			local volumeSetting = Settings.RegisterCVarSetting(category, "Sound_PingVolume", Settings.VarType.Number, PING_VOLUME);
-
-			local minValue, maxValue, step = 0, 1, .05;
-			local function Formatter(value)
-				local roundToNearestInteger = true;
-				return FormatPercentage(value, roundToNearestInteger);
-			end
-			local sliderOptions = Settings.CreateSliderOptions(minValue, maxValue, step);
-			sliderOptions:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, Formatter);
-
-			local initializer = CreateSettingsCheckBoxSliderInitializer(
-					enableSetting, ENABLE_PING_SOUNDS, OPTION_TOOLTIP_ENABLE_PING_SOUNDS,
-					volumeSetting, sliderOptions, PING_VOLUME, OPTION_TOOLTIP_PING_VOLUME);
-			layout:AddInitializer(initializer);
-		end
-	end
+	AudioOverrides.CreatePingSoundSettings(category, layout);
 
 	Settings.RegisterCategory(category, SETTING_GROUP_SYSTEM);
 end

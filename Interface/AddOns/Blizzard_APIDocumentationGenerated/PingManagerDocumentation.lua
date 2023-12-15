@@ -7,12 +7,18 @@ local PingManager =
 	Functions =
 	{
 		{
-			Name = "ClearPendingPingInfo",
+			Name = "GetContextualPingTypeForUnit",
 			Type = "Function",
-		},
-		{
-			Name = "CreateFrame",
-			Type = "Function",
+
+			Arguments =
+			{
+				{ Name = "targetUnit", Type = "WOWGUID", Nilable = true },
+			},
+
+			Returns =
+			{
+				{ Name = "type", Type = "PingSubjectType", Nilable = false },
+			},
 		},
 		{
 			Name = "GetCooldownInfo",
@@ -33,45 +39,6 @@ local PingManager =
 			},
 		},
 		{
-			Name = "GetTargetPingReceiver",
-			Type = "Function",
-
-			Arguments =
-			{
-				{ Name = "mousePosX", Type = "number", Nilable = false },
-				{ Name = "mousePosY", Type = "number", Nilable = false },
-			},
-
-			Returns =
-			{
-				{ Name = "frame", Type = "ScriptRegion", Nilable = false },
-			},
-		},
-		{
-			Name = "GetTargetWorldPing",
-			Type = "Function",
-
-			Arguments =
-			{
-				{ Name = "mousePosX", Type = "number", Nilable = false },
-				{ Name = "mousePosY", Type = "number", Nilable = false },
-			},
-
-			Returns =
-			{
-				{ Name = "foundTarget", Type = "bool", Nilable = false },
-			},
-		},
-		{
-			Name = "GetTargetWorldPingAndSend",
-			Type = "Function",
-
-			Returns =
-			{
-				{ Name = "result", Type = "ContextualWorldPingResult", Nilable = false },
-			},
-		},
-		{
 			Name = "GetTextureKitForType",
 			Type = "Function",
 
@@ -86,18 +53,22 @@ local PingManager =
 			},
 		},
 		{
-			Name = "SendPing",
+			Name = "SendMacroPing",
 			Type = "Function",
 
 			Arguments =
 			{
-				{ Name = "type", Type = "PingSubjectType", Nilable = false },
-				{ Name = "target", Type = "WOWGUID", Nilable = true },
+				{ Name = "type", Type = "PingSubjectType", Nilable = true },
+				{ Name = "targetToken", Type = "cstring", Nilable = true },
 			},
+		},
+		{
+			Name = "TogglePingListener",
+			Type = "Function",
 
-			Returns =
+			Arguments =
 			{
-				{ Name = "result", Type = "PingResult", Nilable = false },
+				{ Name = "down", Type = "bool", Nilable = false },
 			},
 		},
 	},
@@ -105,53 +76,13 @@ local PingManager =
 	Events =
 	{
 		{
-			Name = "PendingPingOffScreen",
+			Name = "PingSystemError",
 			Type = "Event",
-			LiteralName = "PENDING_PING_OFF_SCREEN",
-		},
-		{
-			Name = "PingPinFrameAdded",
-			Type = "Event",
-			LiteralName = "PING_PIN_FRAME_ADDED",
+			LiteralName = "PING_SYSTEM_ERROR",
 			Payload =
 			{
-				{ Name = "region", Type = "ScriptRegion", Nilable = false },
-				{ Name = "uiTextureKit", Type = "textureKit", Nilable = false },
-				{ Name = "isWorldPoint", Type = "bool", Nilable = false },
+				{ Name = "error", Type = "cstring", Nilable = false },
 			},
-		},
-		{
-			Name = "PingPinFrameRemoved",
-			Type = "Event",
-			LiteralName = "PING_PIN_FRAME_REMOVED",
-			Payload =
-			{
-				{ Name = "region", Type = "ScriptRegion", Nilable = false },
-			},
-		},
-		{
-			Name = "PingPinFrameScreenClampStateUpdated",
-			Type = "Event",
-			LiteralName = "PING_PIN_FRAME_SCREEN_CLAMP_STATE_UPDATED",
-			Payload =
-			{
-				{ Name = "region", Type = "ScriptRegion", Nilable = false },
-				{ Name = "state", Type = "bool", Nilable = false },
-			},
-		},
-		{
-			Name = "PingRadialWheelFrameCreated",
-			Type = "Event",
-			LiteralName = "PING_RADIAL_WHEEL_FRAME_CREATED",
-			Payload =
-			{
-				{ Name = "region", Type = "ScriptRegion", Nilable = false },
-			},
-		},
-		{
-			Name = "PingRadialWheelFrameDestroyed",
-			Type = "Event",
-			LiteralName = "PING_RADIAL_WHEEL_FRAME_DESTROYED",
 		},
 	},
 

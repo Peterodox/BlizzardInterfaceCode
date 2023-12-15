@@ -57,7 +57,7 @@ function SetItemRef(link, text, button, chatFrame)
 				if ( ChatEdit_GetActiveWindow() ) then
 					ChatEdit_InsertLink(name);
 				else
-					C_FriendList.SendWho(WHO_TAG_EXACT..name);
+					C_FriendList.SendWho(WHO_TAG_EXACT..name, Enum.SocialWhoOrigin.ITEM);
 				end
 
 			elseif ( button == "RightButton" and (not isGMLink) and FriendsFrame_ShowDropdown) then
@@ -408,6 +408,7 @@ function SetItemRef(link, text, button, chatFrame)
 
 		local reportInfo = ReportInfo:CreateReportInfoFromType(Enum.ReportType.Chat);
 		reportInfo:SetReportTarget(reportTarget);
+		reportInfo:SetReportedChatInline();
 		ReportFrame:InitiateReport(reportInfo, playerName);
 		return; 
 	elseif ( strsub(link, 1, 12) ==  "dungeonScore" ) then 

@@ -1,3 +1,110 @@
+---------------
+--NOTE - Please do not change this section
+local _, tbl, secureCapsuleGet = ...;
+assertsafe(secureCapsuleGet ~= nil, "SecureCapsuleGet not provided to secure environment.");
+tbl.SecureCapsuleGet = secureCapsuleGet;
+tbl.setfenv = tbl.SecureCapsuleGet("setfenv");
+tbl.getfenv = tbl.SecureCapsuleGet("getfenv");
+tbl.type = tbl.SecureCapsuleGet("type");
+tbl.unpack = tbl.SecureCapsuleGet("unpack");
+tbl.error = tbl.SecureCapsuleGet("error");
+tbl.pcall = tbl.SecureCapsuleGet("pcall");
+tbl.pairs = tbl.SecureCapsuleGet("pairs");
+tbl.setmetatable = tbl.SecureCapsuleGet("setmetatable");
+tbl.getmetatable = tbl.SecureCapsuleGet("getmetatable");
+tbl.pcallwithenv = tbl.SecureCapsuleGet("pcallwithenv");
+
+local function CleanFunction(f)
+	local f = function(...)
+		local function HandleCleanFunctionCallArgs(success, ...)
+			if success then
+				return ...;
+			else
+				tbl.error("Error in secure capsule function execution: "..(...));
+			end
+		end
+		return HandleCleanFunctionCallArgs(tbl.pcallwithenv(f, tbl, ...));
+	end
+	setfenv(f, tbl);
+	return f;
+end
+
+local function CleanTable(t, tableCopies)
+	if not tableCopies then
+		tableCopies = {};
+	end
+
+	local cleaned = {};
+	tableCopies[t] = cleaned;
+
+	for k, v in tbl.pairs(t) do
+		if tbl.type(v) == "table" then
+			if ( tableCopies[v] ) then
+				cleaned[k] = tableCopies[v];
+			else
+				cleaned[k] = CleanTable(v, tableCopies);
+			end
+		elseif tbl.type(v) == "function" then
+			cleaned[k] = CleanFunction(v);
+		else
+			cleaned[k] = v;
+		end
+	end
+	return cleaned;
+end
+
+local function Import(name)
+	if tbl[name] ~= nil then
+		return;
+	end
+
+	local skipTableCopy = true;
+	local val = tbl.SecureCapsuleGet(name, skipTableCopy);
+	if tbl.type(val) == "function" then
+		tbl[name] = CleanFunction(val);
+	elseif tbl.type(val) == "table" then
+		tbl[name] = CleanTable(val);
+	else
+		tbl[name] = val;
+	end
+end
+
+if tbl.getmetatable(tbl) == nil then
+	local secureEnvMetatable =
+	{
+		__metatable = false,
+		__environment = false,
+	}
+	tbl.setmetatable(tbl, secureEnvMetatable);
+end
+
+setfenv(1, tbl);
+----------------
+
+Import("C_Ping");
+Import("C_PingSecure");
+Import("Enum");
+Import("PING_TYPE_ASSIST");
+Import("PING_TYPE_ATTACK");
+Import("PING_TYPE_ON_MY_WAY");
+Import("PING_TYPE_WARNING");
+Import("PING_FAILED_SPAMMING");
+Import("PING_FAILED_GENERIC");
+Import("PING_FAILED_DISABLED_BY_LEADER");
+Import("PING_FAILED_DISABLED_BY_SETTINGS");
+Import("PING_FAILED_OUT_OF_PING_AREA");
+Import("PING_FAILED_SQUELCHED");
+Import("PING_FAILED_UNSPECIFIED");
+Import("table");
+
+Import("GetCursorPosition");
+Import("ipairs");
+Import("PingUtil")
+Import("securecallfunction");
+Import("UnitGUID");
+
+----------------
+
 PingManager = {};
 
 local PING_NAME_STRINGS = {
@@ -9,8 +116,11 @@ local PING_NAME_STRINGS = {
 
 local PING_RESULT_STRINGS = {
     [Enum.PingResult.FailedSpamming] = PING_FAILED_SPAMMING,
-    [Enum.PingResult.FailedInvalidTarget] = PING_FAILED_INVALID_TARGET,
+	[Enum.PingResult.FailedGeneric] = PING_FAILED_GENERIC,
     [Enum.PingResult.FailedDisabledByLeader] = PING_FAILED_DISABLED_BY_LEADER,
+    [Enum.PingResult.FailedDisabledBySettings] = PING_FAILED_DISABLED_BY_SETTINGS,
+    [Enum.PingResult.FailedOutOfPingArea] = PING_FAILED_OUT_OF_PING_AREA,
+	[Enum.PingResult.FailedSquelched] = PING_FAILED_SQUELCHED,
     [Enum.PingResult.FailedUnspecified] = PING_FAILED_UNSPECIFIED,
 };
 
@@ -38,9 +148,10 @@ function PingManager:Initialize()
 
     self.pingSpotPool = CreateFramePool("FRAME", nil, "PingSpotFrameTemplate");
 
-    EventRegistry:RegisterFrameEventAndCallback("PING_PIN_FRAME_ADDED", self.OnPingPinFrameAdded, self);
-    EventRegistry:RegisterFrameEventAndCallback("PING_PIN_FRAME_REMOVED", self.OnPingPinFrameRemoved, self);
-    EventRegistry:RegisterFrameEventAndCallback("PING_PIN_FRAME_SCREEN_CLAMP_STATE_UPDATED", self.OnPingPinFrameScreenClampStateUpdated, self);
+	C_PingSecure.SetPingPinFrameAddedCallback(function(...) self:OnPingPinFrameAdded(...) end);
+	C_PingSecure.SetPingPinFrameRemovedCallback(function(...) self:OnPingPinFrameRemoved(...) end);
+	C_PingSecure.SetPingPinFrameScreenClampStateUpdatedCallback(function(...) self:OnPingPinFrameScreenClampStateUpdated(...) end);
+	C_PingSecure.SetSendMacroPingCallback(function(...) self:SendMacroPing(...) end);
 end
 
 function PingManager:SetupDefaultPingOptions()
@@ -99,6 +210,16 @@ function PingManager:OnPingPinFrameScreenClampStateUpdated(frame, state)
     end
 end
 
+-- Returns: frameFound, isPingable, contextualPingType, targetPingGUID
+local function GetTargetPingReceiverInfo_Insecure(posX, posY)
+	local pingFrame = C_PingSecure.GetTargetPingReceiver(posX, posY);
+	if pingFrame then
+		local frameFound = true;
+		return frameFound, pingFrame.IsPingable, pingFrame.GetContextualPingType and pingFrame:GetContextualPingType(), pingFrame.GetTargetPingGUID and pingFrame:GetTargetPingGUID();
+	end
+	return false, nil, nil, nil;
+end
+
 -- Used for ping wheel.
 function PingManager:DeterminePingTarget(posX, posY)
     local result = {
@@ -111,16 +232,16 @@ function PingManager:DeterminePingTarget(posX, posY)
     -- First, see if the cursor is over any valid pingable UI (either as a blocking frame, or a pingable target).
     -- Frames marked as topLevel are marked as valid, usually for being ping blockers.  If marked with the ping-top-level-pass-through attribute, they will no longer be considered valid.
     -- Frames specifically marked with the ping-receiver attribute are also caught here.
-    local pingFrame = C_Ping.GetTargetPingReceiver(posX, posY);
-    if pingFrame then
+	local frameFound, isPingable, contextualPingType, targetPingGUID = securecallfunction(GetTargetPingReceiverInfo_Insecure, posX, posY);
+    if frameFound then
         -- If not pingable, then this is a blocking UI dialog for the ping system, do not make further checks.
-        if pingFrame.IsPingable then
+        if isPingable then
             result.hasTarget = true;
             result.hasUITarget = true;
             result.wedgeInfo = self.defaultWedgeInfo;
-            result.overrideTargetGUID = pingFrame:GetTargetPingGUID();
+            result.overrideTargetGUID = targetPingGUID;
         end
-    elseif C_Ping.GetTargetWorldPing(posX, posY) then
+    elseif C_PingSecure.GetTargetWorldPing(posX, posY) then
         -- Valid object or world point target found.
         result.hasTarget = true;
         result.wedgeInfo = self.defaultWedgeInfo;
@@ -131,21 +252,18 @@ end
 
 -- Used for contextual ping.
 function PingManager:DeterminePingTargetAndSend(posX, posY, spotX, spotY)
-    local pingFrame = C_Ping.GetTargetPingReceiver(posX, posY);
-    if pingFrame then
-        if pingFrame.IsPingable then
-            local contextualType = pingFrame:GetContextualPingType();
-            local overrideTargetGUID = pingFrame:GetTargetPingGUID();
-
-            local pingResult = C_Ping.SendPing(contextualType, overrideTargetGUID);
+	local frameFound, isPingable, contextualPingType, targetPingGUID = securecallfunction(GetTargetPingReceiverInfo_Insecure, posX, posY);
+    if frameFound then
+        if isPingable then
+            local pingResult = C_PingSecure.SendPing(contextualPingType, targetPingGUID);
             if pingResult ~= Enum.PingResult.Success then
-                UIErrorsFrame:AddMessage(GetPingResultString(pingResult), RED_FONT_COLOR:GetRGBA());
+				C_PingSecure.DisplayError(GetPingResultString(pingResult));
             else
-                self:ShowPingSpot(contextualType, spotX, spotY);
+                self:ShowPingSpot(contextualPingType, spotX, spotY);
             end
         else
             -- This is a blocking UI dialog for the ping system, do not make further checks.
-            UIErrorsFrame:AddMessage(PING_ERROR, RED_FONT_COLOR:GetRGBA());
+			C_PingSecure.DisplayError(PING_FAILED_GENERIC);
         end
     else
         self:SendContextualWorldPing(spotX, spotY);
@@ -153,10 +271,10 @@ function PingManager:DeterminePingTargetAndSend(posX, posY, spotX, spotY)
 end
 
 function PingManager:SendContextualWorldPing(spotX, spotY)
-    local pingResult = C_Ping.GetTargetWorldPingAndSend();
+    local pingResult = C_PingSecure.GetTargetWorldPingAndSend();
 
     if pingResult.result ~= Enum.PingResult.Success then
-        UIErrorsFrame:AddMessage(GetPingResultString(pingResult.result), RED_FONT_COLOR:GetRGBA());
+		C_PingSecure.DisplayError(GetPingResultString(pingResult.result));
         return;
     end
 
@@ -173,22 +291,22 @@ function PingManager:SendMacroPing(type, targetUnitToken)
         targetGUID = UnitGUID(targetUnitToken);
 
         if not type then
-            type = PingUtil:GetContextualPingTypeForUnit(targetUnitToken);
+            type = PingUtil:GetContextualPingTypeForUnit(targetGUID);
         end
     else
         local cursorX, cursorY = GetCursorPosition();
-        spotX, spotY = GetScaledCursorPosition(); -- Only set spot if we are dynamically determining our target
+        spotX, spotY = securecallfunction(GetScaledCursorPosition_Insecure); -- Only set spot if we are dynamically determining our target
 
-        local pingFrame = C_Ping.GetTargetPingReceiver(cursorX, cursorY);
-        if pingFrame then
-            if pingFrame.IsPingable then
-                targetGUID = pingFrame:GetTargetPingGUID();
+		local frameFound, isPingable, contextualPingType, targetPingGUID = securecallfunction(GetTargetPingReceiverInfo_Insecure, cursorX, cursorY);
+        if frameFound then
+            if isPingable then
+                targetGUID = targetPingGUID;
                 if not type then
-                    type = pingFrame:GetContextualPingType();
+                    type = contextualPingType;
                 end
             else
                 -- This is a blocking UI dialog for the ping system, do not make further checks.
-                UIErrorsFrame:AddMessage(PING_ERROR, RED_FONT_COLOR:GetRGBA());
+				C_PingSecure.DisplayError(PING_FAILED_GENERIC);
                 return;
             end
         else
@@ -197,7 +315,7 @@ function PingManager:SendMacroPing(type, targetUnitToken)
                 return;
             end
 
-            C_Ping.GetTargetWorldPing(cursorX, cursorY);
+            C_PingSecure.GetTargetWorldPing(cursorX, cursorY);
         end
     end
 
@@ -206,10 +324,10 @@ end
 
 function PingManager:SendPing(type, overrideTargetGUID, spotX, spotY)
     -- overrideTargetGUID can be nil.
-    local pingResult = C_Ping.SendPing(type, overrideTargetGUID);
+    local pingResult = C_PingSecure.SendPing(type, overrideTargetGUID);
 
     if pingResult ~= Enum.PingResult.Success then
-        UIErrorsFrame:AddMessage(GetPingResultString(pingResult), RED_FONT_COLOR:GetRGBA());
+		C_PingSecure.DisplayError(GetPingResultString(pingResult));
         return;
     end
 
@@ -219,13 +337,13 @@ function PingManager:SendPing(type, overrideTargetGUID, spotX, spotY)
 end
 
 function PingManager:CancelPendingPing()
-    C_Ping.ClearPendingPingInfo();
+    C_PingSecure.ClearPendingPingInfo();
 end
 
 function PingManager:ShowPingSpot(type, posX, posY)
     local pingSpot = self.pingSpotPool:Acquire();
     pingSpot:ClearAllPoints();
-    pingSpot:SetPoint("CENTER", UIParent, "BOTTOMLEFT", posX, posY);
+    pingSpot:SetPoint("CENTER", "UIParent", "BOTTOMLEFT", posX, posY);
 
     local uiTextureKit = C_Ping.GetTextureKitForType(type);
     pingSpot.GlowIn:SetAtlas(("Ping_SpotGlw_%s_In"):format(uiTextureKit), true);

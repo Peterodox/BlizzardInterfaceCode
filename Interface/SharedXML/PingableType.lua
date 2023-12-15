@@ -15,9 +15,9 @@ end
 PingableType_UnitFrameMixin = CreateFromMixins(PingableTypeMixin);
 
 function PingableType_UnitFrameMixin:GetContextualPingType()
-    return PingUtil:GetContextualPingTypeForUnit(self.unit);
+    return PingUtil:GetContextualPingTypeForUnit(self:GetTargetPingGUID());
 end
 
 function PingableType_UnitFrameMixin:GetTargetPingGUID()
-    return UnitGUID(self.unit);
+    return UnitGUID(self.unit or self:GetAttribute("unit"));
 end

@@ -59,7 +59,10 @@ function LootHistoryElementMixin:SetTooltip()
 				anyRollNumbers = true; -- If there are any roll numbers, they will be at the top of the roll list
 			end
 
-			if (roll.state <= topRollState and roll.state < Enum.EncounterLootDropRollState.NoRoll) or (roll.isSelf and roll.state ~= Enum.EncounterLootDropRollState.NoRoll) then
+			-- Skip rolls that are in a weird state due to multiple item instance win protection
+			local skipRoll = self.dropInfo.winner and not roll.isWinner and roll.roll and roll.roll > self.dropInfo.winner.roll;
+
+			if not skipRoll and ((roll.state <= topRollState and roll.state < Enum.EncounterLootDropRollState.NoRoll) or (roll.isSelf and roll.state ~= Enum.EncounterLootDropRollState.NoRoll)) then
 				local newFrame = tooltipLinePool:Acquire();
 				newFrame:Init(roll, anyRollNumbers);
 				GameTooltip_InsertFrame(GameTooltip, newFrame);
@@ -78,7 +81,7 @@ function LootHistoryElementMixin:SetTooltip()
 			end
 		end
 
-		if waitingOnAny then
+		if waitingOnAny and not self.dropInfo.winner then
 			if anyRollFrames then
 				GameTooltip_AddBlankLineToTooltip(GameTooltip);
 			end
@@ -91,6 +94,10 @@ function LootHistoryElementMixin:SetTooltip()
 end
 
 function LootHistoryElementMixin:Init(dropInfo)
+	if not dropInfo then
+		return;
+	end
+
 	self.dropInfo = dropInfo;
 
 	local item = Item:CreateFromItemLink(dropInfo.itemHyperlink);
@@ -130,6 +137,7 @@ function LootHistoryElementMixin:Init(dropInfo)
 			end
 
 			self.PendingRollInfo.CurrentWinnerText:SetText(LOOT_HISTORY_CURRENT_WINNER:format(leaderName, dropInfo.currentLeader.roll));
+			self.PendingRollInfo.WaitDot1:SetPoint("RIGHT", self.PendingRollInfo.CurrentWinnerText, "LEFT", -4, -1);
 		else
 			self.PendingRollInfo.CurrentWinnerText:SetText(nil);
 			self.PendingRollInfo.WaitDot1:SetPoint("RIGHT", self.PendingRollInfo.CurrentWinnerText, "LEFT", -3, -1);
@@ -187,6 +195,34 @@ function LootHistoryElementMixin:OnHide()
 	FrameUtil.UnregisterFrameForEvents(self, LootHistoryElementEvents);
 end
 
+LootHistoryElementAnimationMixin = {};
+
+function LootHistoryElementAnimationMixin:OnLoad()
+	self.BorderFrame:Hide();
+	self.NameFrame:Hide();
+end
+
+function LootHistoryElementAnimationMixin:InitAndStartAnim(dropInfo)
+	self.Item.IconBorder:SetSize(self.Item:GetWidth(), self.Item:GetHeight());
+
+	self:Init(dropInfo);
+	self:PlayPerfectRollAnim();
+end
+
+function LootHistoryElementAnimationMixin:PlayPerfectRollAnim()
+	self:Show();
+
+	PlaySound(SOUNDKIT.UI_NEED_ROLL_ONE_HUNDRED);
+	self.PerfectRollFrame.Anim:Play();
+	self.PerfectRollTopFrame.Anim:Play();
+end
+
+function LootHistoryElementAnimationMixin:StopPerfectRollAnim()
+	self:Hide();
+
+	self.PerfectRollFrame.Anim:Stop();
+	self.PerfectRollTopFrame.Anim:Stop();
+end
 
 LootHistoryRollTooltipLineMixin = {};
 
@@ -257,6 +293,7 @@ local LootHistoryFrameAlwaysListenEvents =
 local LootHistoryFrameWhenShownEvents =
 {
 	"LOOT_HISTORY_UPDATE_ENCOUNTER",
+	"LOOT_HISTORY_ONE_HUNDRED_ROLL",
 };
 
 function LootHistoryFrameMixin:OnLoad()
@@ -269,6 +306,9 @@ end
 
 function LootHistoryFrameMixin:OnShow()
 	FrameUtil.RegisterFrameForEvents(self, LootHistoryFrameWhenShownEvents);
+	self.PerfectAnimFrame.PerfectRollFrame.Anim:SetScript("OnFinished", GenerateClosure(self.CleanUpPerfectRollAnim, self));
+
+	self.perfectRollItemQueue = {};
 
 	self:SetupEncounterDropDown();
 
@@ -305,6 +345,13 @@ function LootHistoryFrameMixin:OnEvent(event, ...)
 		self:SetScript("OnUpdate", nil);
 		self.selectedEncounterID = nil;
 		self.encounterInfo = nil;
+	elseif event == "LOOT_HISTORY_ONE_HUNDRED_ROLL" then
+		local encounterID, lootListID = ...;
+
+		if encounterID == self.selectedEncounterID then
+			self:AddPerfectAnimToQueue(encounterID, lootListID);
+			self:DoFullRefresh();
+		end
 	end
 end
 
@@ -397,6 +444,13 @@ end
 
 function LootHistoryFrameMixin:OpenToEncounter(encounterID)
 	self:SetInfoShown(true);
+	
+	if encounterID ~= self.selectedEncounterID then
+		self.ScrollBox:ScrollToBegin();
+		self.PerfectAnimFrame:StopPerfectRollAnim();
+		self.perfectRollItemQueue = {};
+	end
+
 	self.selectedEncounterID = encounterID;
 	self:SetupEncounterDropDown();
 	UIDropDownMenu_SetSelectedValue(self.EncounterDropDown, encounterID);
@@ -457,7 +511,9 @@ function LootHistoryFrameMixin:DoFullRefresh()
 
 		dataProvider:Insert({encounterID = self.selectedEncounterID, lootListID = dropInfo.lootListID});
 	end
+	local scrollPercentage = self.ScrollBox:GetScrollPercentage();
 	self.ScrollBox:SetDataProvider(dataProvider);
+	self.ScrollBox:SetScrollPercentage(scrollPercentage);
 
 	if anyRolledOn and not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_LOOT_HISTORY_ROLL) then
 		local rolledHelpTipInfo =
@@ -473,6 +529,61 @@ function LootHistoryFrameMixin:DoFullRefresh()
 			bitfieldFlag = LE_FRAME_TUTORIAL_LOOT_HISTORY_ROLL,
 		};
 		HelpTip:Show(self, rolledHelpTipInfo, self);
+	end
+
+	if self.perfectRollItemQueue[1] then
+		local itemData = dataProvider:FindElementDataByPredicate(function(itemData)
+			return self.perfectRollItemQueue[1].loot == itemData.lootListID and self.perfectRollItemQueue[1].encounter == itemData.encounterID;
+		end);
+
+		if itemData then
+			self.ScrollBox:FullUpdate(ScrollBoxConstants.UpdateImmediately);
+			self.ScrollBox:ScrollToElementData(itemData, ScrollBoxConstants.AlignCenter, ScrollBoxConstants.NoScrollInterpolation);
+
+			local itemFrame = self.ScrollBox:FindFrame(itemData);
+			local currDropInfo = drops[self.ScrollBox:FindElementDataIndex(itemData)];
+
+			self:UpdatePerfectAnimQueue(itemData, itemFrame, currDropInfo);
+		end
+	else
+		self.ScrollBox:SetScrollAllowed(true);
+	end
+end
+
+function LootHistoryFrameMixin:UpdatePerfectAnimQueue(itemData, itemFrame, dropInfo)
+	local currPerfectAnimItem = self.perfectRollItemQueue[1];
+
+	if not currPerfectAnimItem.animStarted then
+		self.ScrollBox:SetScrollAllowed(false);
+
+		currPerfectAnimItem.animStarted = true;
+		self.PerfectAnimFrame:InitAndStartAnim(dropInfo);
+	end
+
+	self.PerfectAnimFrame:SetPoint("TOPLEFT", itemFrame, "TOPLEFT", 0, 0);
+	self.PerfectAnimFrame:SetPoint("BOTTOMRIGHT", itemFrame, "BOTTOMRIGHT", 0, 0);
+end
+
+function LootHistoryFrameMixin:AddPerfectAnimToQueue(encounterID, lootListID)
+	table.insert(self.perfectRollItemQueue, {encounter = encounterID, loot = lootListID });
+end
+
+function LootHistoryFrameMixin:RemoveItemFromQueue()
+	self.ScrollBox:SetScrollAllowed(true);
+
+	if not self.perfectRollItemQueue[1] then
+		return;
+	end
+
+	table.remove(self.perfectRollItemQueue, 1);
+end
+
+function LootHistoryFrameMixin:CleanUpPerfectRollAnim()
+	self:RemoveItemFromQueue();
+
+	self.PerfectAnimFrame:Hide();
+	if self:IsShown() then
+		self:DoFullRefresh();
 	end
 end
 

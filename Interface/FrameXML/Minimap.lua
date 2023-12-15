@@ -297,11 +297,7 @@ function MinimapClusterMixin:CheckTutorials()
 	if not self:IsShown() then
 		return;
 	end
-	if GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_HUD_REVAMP_TRACKING_CHANGES) then
-		if not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_HUD_REVAMP_UNIT_FRAME_CHANGES) then
-			EventRegistry:TriggerEvent("Tutorials.ShowUnitFrameChanges");
-		end
-	else
+	if not GetCVarBitfield("closedInfoFrames", LE_FRAME_TUTORIAL_HUD_REVAMP_TRACKING_CHANGES) then
 		local helpTipInfo = {
 			text = TUTORIAL_HUD_REVAMP_TRACKING_CHANGES,
 			buttonStyle = HelpTip.ButtonStyle.Close,
@@ -746,11 +742,7 @@ local GarrisonLandingPageEvents = {
 };
 
 function ExpansionLandingPageMinimapButtonMixin:OnLoad()
-	EventRegistry:RegisterCallback("ExpansionLandingPage.OverlayChanged", self.RefreshButton, self);	
-
-	if not ExpansionLandingPage then
-		ExpansionLandingPage_LoadUI();
-	end
+	EventRegistry:RegisterCallback("ExpansionLandingPage.OverlayChanged", self.RefreshButton, self);
 
 	self.pulseLocks = {};
 

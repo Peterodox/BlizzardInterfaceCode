@@ -4,6 +4,7 @@
 ..\..\SharedXML\MathUtil.lua
 ..\..\SharedXML\EnumUtil.lua
 ..\..\SharedXML\TableUtil.lua
+..\..\SharedXML\LinkUtil.lua
 ..\..\SharedXML\Flags.lua
 ..\..\SharedXML\Spline.lua
 ..\..\SharedXML\PixelUtilSecure.lua
@@ -40,6 +41,7 @@
 ..\..\SharedXML\NineSlice.lua
 ..\..\SharedXML\PortraitFrame.lua
 ..\..\SharedXML\SecureUIPanelTemplates.lua
+..\..\SharedXML\Spinner.lua
 ..\..\SharedXML\VASErrorLookup.lua
 
 Blizzard_Shared_StoreButtonMixin.lua

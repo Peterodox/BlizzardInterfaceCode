@@ -1,16 +1,22 @@
 -- Utility functions
+function toCharacterNameCasing(name)
+	return C_CharacterServices.CapitalizeCharName(name);
+end
+
 function DoesClientThinkTheCharacterIsEligibleForPNC(characterID)
-	local level, _, _, _, _, _, _, _, playerguid, _, _, _, _, _, _, _, _, _, _, _, _, _, faction, _, mailSenders, _, _, characterServiceRequiresLogin = select(7, GetCharacterInfo(characterID));
+	local level, _, _, _, _, _, _, _, playerguid, _, _, _, _, _, _, _, _, _, _, _, _, _, faction, _, mailSenders, _, _, _ = select(7, GetCharacterInfo(characterID));
 	local sameFaction = CharacterHasAlternativeRaceOptions(characterID);
 	local errors = {};
 
 	CheckAddVASErrorCode(errors, Enum.VasError.UnderMinLevelReq, level >= 10);
-	CheckAddVASErrorCode(errors, Enum.VasError.IsNpeRestricted, not IsCharacterNPERestricted(playerguid));
+	if IsCharacterNPERestricted then
+		CheckAddVASErrorCode(errors, Enum.VasError.IsNpeRestricted, not IsCharacterNPERestricted(playerguid));
+	end
 	CheckAddVASErrorCode(errors, Enum.VasError.IneligibleMapID, not IsCharacterInTutorialMap(playerguid));
 	CheckAddVASErrorString(errors, BLIZZARD_STORE_VAS_ERROR_CHARACTER_INELIGIBLE_FOR_THIS_SERVICE, not IsCharacterVASRestricted(playerguid, Enum.ValueAddedServiceType.PaidNameChange));
 
 	local canTransfer = #errors == 0;
-	return canTransfer, errors, playerguid, characterServiceRequiresLogin;
+	return canTransfer, errors, playerguid, false;
 end
 
 local function RequestAssignPNCForResults(results, isValidationOnly)
@@ -33,14 +39,6 @@ end
 
 function PNCCharacterSelectBlock:SetResultsShown(shown)
 	self.frame.ResultsFrame:SetShown(shown);
-
-	if shown then
-		local result = self:GetResult();
-		if result.selectedCharacterGUID then
-			local name = GetCharacterInfoByGUID(result.selectedCharacterGUID);
-			self.frame.ResultsFrame.CurrentNameLabel:SetText(name);
-		end
-	end
 end
 
 function PNCCharacterSelectBlock:GetServiceInfoByCharacterID(characterID)
@@ -74,6 +72,7 @@ function PNCNameSelectBlock:Initialize(results, wasFromRewind)
 	end
 
 	self.frame.ControlsFrame.NewNameEditbox:Initialize(results, wasFromRewind);
+	
 	self:CheckUpdate();
 end
 
@@ -82,14 +81,15 @@ function PNCNameSelectBlock:CheckUpdate()
 end
 
 function PNCNameSelectBlock:GetResult()
+	local formatedName = toCharacterNameCasing(self.frame.ControlsFrame.NewNameEditbox:GetNewName());
 	return {
-		name = self.frame.ControlsFrame.NewNameEditbox:GetNewName()
+		name = formatedName
 	}
 end
 
 function PNCNameSelectBlock:FormatResult()
 	local result = self:GetResult();
-	return PNC_NEW_NAME_LABEL_COMPLETE:format(result.name)
+	return result.name
 end
 
 function PNCNameSelectBlock:IsFinished(wasFromRewind)
@@ -112,12 +112,17 @@ function NewNameEditboxMixin:Initialize(_, wasFromRewind)
 	if not wasFromRewind then
 		self:SetText("");
 	end
+	self:SetMaxLetters(12); -- From CharacterNameStringConsts::CHARACTERNAME in CharacterConstants.tag.
 end
 
 function NewNameEditboxMixin:OnEnter()
 	GetAppropriateTooltip():SetOwner(self, "ANCHOR_RIGHT");
 	GetAppropriateTooltip():SetText(VAS_NAME_CHANGE_TOOLTIP);
 	GetAppropriateTooltip():Show();
+end
+
+function NewNameEditboxMixin:OnLeave()
+	GetAppropriateTooltip():Hide();
 end
 
 function NewNameEditboxMixin:GetNewName()
@@ -132,9 +137,26 @@ end
 local PNCChoiceVerificationBlock = CreateFromMixins(VASChoiceVerificationBlockBase);
 
 function PNCChoiceVerificationBlock:RequestAssignVASForResults(results, isValidationOnly)
+	
+	local valid, reason = C_CharacterCreation.IsCharacterNameValid(results.name)
+	if not valid then 
+		self.errorSet = true; --This flag is so when we rewind due to invalid name, the error messages wont be cleared. 
+		CharSelectServicesFlowFrame:SetErrorMessage(_G[reason]);
+		CharacterServicesMaster.flow:RequestRewind();
+		return false, 0;
+	else
+		self.errorSet = false;
+	end
 	return RequestAssignPNCForResults(results, isValidationOnly);
 end
 
+function PNCChoiceVerificationBlock:OnRewind()
+	self.isAssignmentValid = false;
+	if not self.errorSet then
+		CharSelectServicesFlowFrame:ClearErrorMessage();
+	end
+	self:UnregisterHandlers();
+end
 -- PNCAssignConfirmationBlock
 local PNCAssignConfirmationBlock = CreateFromMixins(VASAssignConfirmationBlockBase)
 do

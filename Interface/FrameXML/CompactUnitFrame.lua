@@ -549,7 +549,7 @@ function CompactUnitFrame_UpdateHealthColor(frame)
 				r, g, b = 0.9, 0.9, 0.9;
 			elseif ( frame.optionTable.colorHealthBySelection ) then
 				-- Use color based on the type of unit (neutral, etc.)
-				if ( frame.optionTable.considerSelectionInCombatAsHostile and CompactUnitFrame_IsOnThreatListWithPlayer(frame.displayedUnit) ) then
+				if ( frame.optionTable.considerSelectionInCombatAsHostile and CompactUnitFrame_IsOnThreatListWithPlayer(frame.displayedUnit) and not UnitIsFriend("player", frame.unit) ) then
 					r, g, b = 1.0, 0.0, 0.0;
 				elseif ( UnitIsPlayer(frame.displayedUnit) and UnitIsFriend("player", frame.displayedUnit) ) then
 					-- We don't want to use the selection color for friendly player nameplates because
@@ -762,13 +762,17 @@ function CompactUnitFrame_UpdateName(frame)
 			end
 		end
 
+		if ( UnitInPartyIsAI(frame.unit) and C_LFGInfo.IsInLFGFollowerDungeon() ) then
+			name = LFG_FOLLOWER_NAME_PREFIX:format(name);
+		end
+
 		frame.name:SetText(name);
 
 		if ( CompactUnitFrame_IsTapDenied(frame) or (UnitIsDead(frame.unit) and not UnitIsPlayer(frame.unit)) ) then
 			-- Use grey if not a player and can't get tap on unit
 			frame.name:SetVertexColor(0.5, 0.5, 0.5);
 		elseif ( frame.optionTable.colorNameBySelection ) then
-			if ( frame.optionTable.considerSelectionInCombatAsHostile and CompactUnitFrame_IsOnThreatListWithPlayer(frame.displayedUnit) ) then
+			if ( frame.optionTable.considerSelectionInCombatAsHostile and CompactUnitFrame_IsOnThreatListWithPlayer(frame.displayedUnit)  and not UnitIsFriend("player", frame.unit)  ) then
 				frame.name:SetVertexColor(1.0, 0.0, 0.0);
 			else
 				frame.name:SetVertexColor(UnitSelectionColor(frame.unit, frame.optionTable.colorNameWithExtendedColors));
@@ -1118,8 +1122,6 @@ function CompactUnitFrame_UpdateHealPrediction(frame)
 	CompactUnitFrameUtil_UpdateFillBar(frame, appendTexture, frame.totalAbsorb, totalAbsorb)
 end
 
---WARNING: This function is very similar to the function UnitFrameUtil_UpdateFillBar in UnitFrame.lua.
---If you are making changes here, it is possible you may want to make changes there as well.
 function CompactUnitFrameUtil_UpdateFillBar(frame, previousTexture, bar, amount, barOffsetXPercent)
 	local totalWidth, totalHeight = frame.healthBar:GetSize();
 
@@ -1172,7 +1174,8 @@ function CompactUnitFrame_UpdateRoleIcon(frame)
 	else
 		local role = UnitGroupRolesAssigned(frame.unit);
 		if ( frame.optionTable.displayRoleIcon and (role == "TANK" or role == "HEALER" or role == "DAMAGER") ) then
-			frame.roleIcon:SetAtlas(GetMicroIconForRole(role), TextureKitConstants.IgnoreAtlasSize);
+			frame.roleIcon:SetTexture("Interface\\LFGFrame\\UI-LFG-ICON-PORTRAITROLES");
+			frame.roleIcon:SetTexCoord(GetTexCoordsForOldRoleSmallCircle(role));
 			frame.roleIcon:Show();
 			frame.roleIcon:SetSize(size, size);
 		else
@@ -1190,13 +1193,13 @@ function CompactUnitFrame_UpdateReadyCheck(frame)
 	local readyCheckStatus = GetReadyCheckStatus(frame.unit);
 	frame.readyCheckStatus = readyCheckStatus;
 	if ( readyCheckStatus == "ready" ) then
-		frame.readyCheckIcon:SetAtlas(READY_CHECK_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
+		frame.readyCheckIcon:SetAtlas(READY_CHECK_READY_TEXTURE_RAID, TextureKitConstants.IgnoreAtlasSize);
 		frame.readyCheckIcon:Show();
 	elseif ( readyCheckStatus == "notready" ) then
-		frame.readyCheckIcon:SetAtlas(READY_CHECK_NOT_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
+		frame.readyCheckIcon:SetAtlas(READY_CHECK_NOT_READY_TEXTURE_RAID, TextureKitConstants.IgnoreAtlasSize);
 		frame.readyCheckIcon:Show();
 	elseif ( readyCheckStatus == "waiting" ) then
-		frame.readyCheckIcon:SetAtlas(READY_CHECK_WAITING_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
+		frame.readyCheckIcon:SetAtlas(READY_CHECK_WAITING_TEXTURE_RAID, TextureKitConstants.IgnoreAtlasSize);
 		frame.readyCheckIcon:Show();
 	else
 		frame.readyCheckIcon:Hide();
@@ -1212,7 +1215,7 @@ function CompactUnitFrame_FinishReadyCheck(frame)
 		CompactUnitFrame_CheckNeedsUpdate(frame);
 
 		if ( frame.readyCheckStatus == "waiting" ) then	--If you haven't responded, you are not ready.
-			frame.readyCheckIcon:SetAtlas(READY_CHECK_NOT_READY_TEXTURE, TextureKitConstants.IgnoreAtlasSize);
+			frame.readyCheckIcon:SetAtlas(READY_CHECK_NOT_READY_TEXTURE_RAID, TextureKitConstants.IgnoreAtlasSize);
 			frame.readyCheckIcon:Show();
 		end
 	else
